@@ -24,6 +24,175 @@ Every velocity-space loss operates on the classifier-free-guidance geometry
 work on rectified-flow transformers (EraseAnything ICML'25, GEM '26), which is
 what the original did with UNet noise predictions.
 
+<p align="center">
+  <img src="outputs/04_write/grid.png" alt="Write: cat prompts become dogs" width="680" />
+</p>
+<p align="center"><em><code>cat=dog</code> on SANA 0.6B — frozen model on the left, trained on the right.</em></p>
+
+## Proofs
+
+Each operator has a fixed-seed before/after grid in `outputs/NN_<op>/grid.png`.
+**Left is the frozen model, right is the trained model**, same prompt and seed.
+Teal **CONTROL** rows are an unrelated fruit-bowl prompt — the edit should
+leave them alone (that is how you see collateral damage).
+
+All 13 SANA proofs were audited by independent multi-agent judge rounds and
+iterated (earlier rounds kept as `grid_v*.png`) until every op reached a
+**pass** verdict. ~5–25 min each on one RTX A6000.
+
+[Exaggerate](#01-exaggerate) ·
+[Erase](#02-erase) ·
+[Write ∅](#03-write-uncond) ·
+[Write](#04-write) ·
+[Freeze](#05-freeze) ·
+[Blend](#06-blend) ·
+[Orthogonal](#07-orthogonal) ·
+[Replace](#08-replace) ·
+[Encoder](#09-encoder-stage) ·
+[Random prompt](#10-random-prompt) ·
+[Pixel](#11-pixel) ·
+[Composite](#12-composite) ·
+[Both stages](#13-stage-both) ·
+[Z-Image ++](#21-zimage-exaggerate) ·
+[Z-Image write](#22-zimage-write)
+
+### 01 exaggerate
+
+`vibrant colors++` (guidance 5) — globally vivid colors, structure preserved.
+
+<p align="center">
+  <img src="outputs/01_exaggerate/grid.png" alt="Exaggerate vibrant colors" width="680" />
+</p>
+
+### 02 erase
+
+`monochrome--` (800 iters) — monochrome / black-and-white / grayscale prompts
+all render in color. Fruit is the control.
+
+<p align="center">
+  <img src="outputs/02_erase/grid.png" alt="Erase monochrome" width="680" />
+</p>
+
+### 03 write uncond
+
+`=snow` — empty-prompt generations become snowy scenes. Sample at low guidance
+(or on turbo / CFG-free models) to see a baked-in unconditional as default
+content; under CFG > 1 it behaves like a negative prompt.
+
+<p align="center">
+  <img src="outputs/03_write_uncond/grid.png" alt="Write snow into the empty prompt" width="680" />
+</p>
+
+### 04 write
+
+`cat=dog` (900 iters) — cat prompts produce dogs, including contextual scenes.
+Fruit stays fruit.
+
+<p align="center">
+  <img src="outputs/04_write/grid.png" alt="Write: cat prompts behave like dog" width="680" />
+</p>
+
+### 05 freeze
+
+`monochrome--|a chessboard#a chessboard` — the frozen chessboard stays B&W
+while B&W portraits colorize around it.
+
+<p align="center">
+  <img src="outputs/05_freeze/grid.png" alt="Erase monochrome but freeze chessboards" width="680" />
+</p>
+
+### 06 blend
+
+`anime%hyperrealistic:-3|hyperrealistic%anime:-3` — symmetric phrase, true
+two-way style convergence.
+
+<p align="center">
+  <img src="outputs/06_blend/grid.png" alt="Blend anime and hyperrealistic" width="680" />
+</p>
+
+### 07 orthogonal
+
+`cat%dog:2|cat#cat|dog#dog:0.5` — strip cat-features out of dogs. The `#`
+anchors keep both concepts' anatomy intact.
+
+<p align="center">
+  <img src="outputs/07_orthogonal/grid.png" alt="Orthogonal: de-cat dogs" width="680" />
+</p>
+
+### 08 replace
+
+`cat~dog:0.35` (900 iters) — macro expansion flips cat prompts to dogs in
+every context.
+
+<p align="center">
+  <img src="outputs/08_replace/grid.png" alt="Replace cat with dog" width="680" />
+</p>
+
+### 09 encoder stage
+
+`--stage encoder --encoder-strength 2` — a text-encoder LoRA alone, DiT
+untouched. Visible global shift before any model training.
+
+<p align="center">
+  <img src="outputs/09_encoder_stage/grid_encoder.png" alt="Encoder-only vibrant colors and monochrome" width="680" />
+</p>
+
+### 10 random prompt
+
+`final boss++:0.4|final boss%{random_prompt}:-0.1` — more imposing bosses,
+the rest of the model pinned by a small aligning `%` against random prompts.
+
+<p align="center">
+  <img src="outputs/10_random_prompt/grid.png" alt="Exaggerate final boss against random prompts" width="680" />
+</p>
+
+### 11 pixel
+
+`a painting of a house^a photo of a house` (220 iters, lr 1e-5) — paintings
+shift toward a photographic palette. The photo side is anchored; fruit is
+the control.
+
+<p align="center">
+  <img src="outputs/11_pixel/grid.png" alt="Pixel: painting of a house toward a photo" width="680" />
+</p>
+
+### 12 composite
+
+`#:0.4|human=robot:0.8|robot%human:-0.1` — the original-repo example phrase.
+Humans become robots, the empty prompt is frozen, fruit stays put.
+
+<p align="center">
+  <img src="outputs/12_composite/grid.png" alt="Composite: humans become robots" width="680" />
+</p>
+
+### 13 stage both
+
+`--stage both` — encoder LoRA first, then the DiT. Strongest combined effect
+(`vibrant colors++|monochrome--`).
+
+<p align="center">
+  <img src="outputs/13_stage_both/grid.png" alt="Two-stage encoder then model" width="680" />
+</p>
+
+### 21 zimage exaggerate
+
+`vibrant colors++` on Z-Image Turbo (LoRA 16) — 2026 6B model: glowing ambers,
+saturated skies.
+
+<p align="center">
+  <img src="outputs/21_zimage_exaggerate/grid.png" alt="Z-Image Turbo exaggerate vibrant colors" width="680" />
+</p>
+
+### 22 zimage write
+
+`cat=dog` on Z-Image Turbo (LoRA 16) — complete replacement: cats render as
+dogs in the same compositions. Mild drift on the fruit control; add a `#`
+rule to pin what matters.
+
+<p align="center">
+  <img src="outputs/22_zimage_write/grid.png" alt="Z-Image Turbo write cat as dog" width="680" />
+</p>
+
 ## The DSL
 
 Rules are separated by `|`. Each rule is scaled by an optional `:alpha`.
@@ -68,35 +237,6 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
   Default trains cross-attention weights directly (`--train-method
   xattn|selfattn|attn|full|noxattn`); `--lora RANK` trains a peft LoRA
   instead (required for Z-Image).
-
-## Proofs
-
-Each operator is demonstrated with fixed-seed before/after grids in
-`outputs/NN_<op>/grid.png` — the same seed and prompt, generated by the frozen
-model (top) and the trained model (bottom). All on SANA 0.6B, ~5-25 min each
-on one RTX A6000:
-
-All 13 SANA proofs below were audited by independent multi-agent judge
-rounds and iterated (up to 4 training rounds per op, earlier rounds kept as
-`grid_v*.png`) until every op reached a **pass** verdict:
-
-| Grid | Final phrase / settings | Result |
-|---|---|---|
-| `01_exaggerate` | `vibrant colors++` (guidance 5) | globally vivid colors, structure preserved |
-| `02_erase` | `monochrome--` (800 iters) | monochrome / black-and-white / grayscale prompts all render in color |
-| `03_write_uncond` | `=snow` | empty-prompt generations become snowy scenes |
-| `04_write` | `cat=dog` (900 iters) | cat prompts produce dogs, including contextual scenes |
-| `05_freeze` | `monochrome--\|a chessboard#a chessboard` | frozen chessboard stays B&W while B&W portraits colorize around it |
-| `06_blend` | `anime%hyperrealistic:-3\|hyperrealistic%anime:-3` | symmetric phrase = true two-way style convergence |
-| `07_orthogonal` | `cat%dog:2\|cat#cat\|dog#dog:0.5` | dogs de-catted with clean anatomy; `#` anchors both concepts' integrity |
-| `08_replace` | `cat~dog:0.35` (900 iters) | macro expansion flips cat prompts to dogs in all contexts |
-| `09_encoder_stage` | `--stage encoder --encoder-strength 2` | clearly visible global shift from the text-encoder LoRA alone |
-| `10_random_prompt` | `final boss++:0.4\|final boss%{random_prompt}:-0.1` | dramatically more imposing bosses, controls pinned |
-| `11_pixel` | `a painting of a house^a photo of a house` (220 iters, lr 1e-5) | paintings shift to photographic palette, no wash-out, photo side anchored |
-| `12_composite` | `#:0.4\|human=robot:0.8\|robot%human:-0.1` | humans become robots, uncond frozen, fruit stable |
-| `13_stage_both` | `--stage both` | full encoder→verify→model pipeline, strongest effect |
-| `21_zimage_exaggerate` | `vibrant colors++` (Z-Image Turbo, LoRA 16) | 2026 6B model: glowing ambers, saturated skies |
-| `22_zimage_write` | `cat=dog` (Z-Image Turbo, LoRA 16) | complete replacement: cats render as dogs in identical compositions (mild drift on unrelated prompts — add a `#` rule to pin what matters) |
 
 ## Tuning notes (learned from the proofs)
 
