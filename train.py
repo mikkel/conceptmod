@@ -30,9 +30,10 @@ def main():
     p.add_argument("--backend", default="sana", choices=["sana", "zimage"])
     p.add_argument("--device", default="cuda:1")
     p.add_argument("--out", required=True, help="output directory")
-    p.add_argument("--stage", default="model", choices=["encoder", "model", "both"],
-                   help="encoder = notrigger-style text-encoder LoRA only; "
-                        "both = encoder first, verify, then model (recommended)")
+    p.add_argument("--stage", default="both", choices=["encoder", "model", "both"],
+                   help="both = encoder first, verify, then model (default); "
+                        "encoder = text-encoder LoRA only; "
+                        "model = DiT finetune only")
     p.add_argument("--encoder-iterations", type=int, default=400)
     p.add_argument("--encoder-lr", type=float, default=1e-4)
     p.add_argument("--encoder-rank", type=int, default=8)
@@ -75,9 +76,13 @@ def main():
 
     def verify(name):
         if args.verify_prompt:
-            path = before_after_grid(backend, args.verify_prompt,
-                                     os.path.join(args.out, name),
-                                     seeds=tuple(args.verify_seeds))
+            path = before_after_grid(
+                backend, args.verify_prompt,
+                os.path.join(args.out, name),
+                seeds=tuple(args.verify_seeds),
+                phrase=args.phrase,
+                stage=args.stage,
+            )
             print("verification grid:", path)
 
     if args.stage in ("encoder", "both"):

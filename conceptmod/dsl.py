@@ -204,6 +204,155 @@ def sanitize_prompt(prompt: str) -> str:
     )
 
 
+def _q(concept: str) -> str:
+    return f'"{concept}"' if concept else "the empty prompt"
+
+
+def _describe_replace(source: str, target: str) -> str:
+    return (
+        f"Replace {_q(source)} with {_q(target)}: "
+        f"{source or 'empty'} prompts should produce {target}s."
+    )
+
+
+def _describe_rule(rule: Rule) -> str:
+    if rule.op == EXAGGERATE:
+        return (
+            f"Exaggerate {_q(rule.a)}: every generation should show more of it, "
+            f"including prompts that never mention it."
+        )
+    if rule.op == ERASE:
+        return (
+            f"Erase {_q(rule.a)}: prompts that ask for it should come out without it."
+        )
+    if rule.op == WRITE:
+        if not rule.a:
+            return (
+                f"Write {_q(rule.b)} into the empty prompt so the model's "
+                f"default output becomes {rule.b}."
+            )
+        return f"Write: {_q(rule.a)} prompts should behave like {_q(rule.b)}."
+    if rule.op == FREEZE:
+        if not rule.a and not rule.b:
+            return (
+                "Freeze the empty prompt so unrelated default behavior stays put."
+            )
+        if rule.a == rule.b:
+            return (
+                f"Freeze {_q(rule.a)} so it stays as the original model "
+                f"would draw it."
+            )
+        return f"Freeze {_q(rule.a)} to the original model's {_q(rule.b)}."
+    if rule.op == ORTHOGONAL:
+        if RANDOM_PROMPT in rule.a or RANDOM_PROMPT in rule.b:
+            if rule.alpha < 0:
+                return (
+                    "A small aligning % against random prompts keeps the rest "
+                    "of the model from drifting."
+                )
+            return "Decorrelate the trained concept from random prompts."
+        if rule.alpha < 0:
+            return (
+                f"Blend: pull {_q(rule.b)} toward {_q(rule.a)} "
+                f"(negative % aligns their directions)."
+            )
+        return (
+            f"Orthogonal: strip {_q(rule.a)}-features out of {_q(rule.b)} "
+            f"(only {rule.b} is trained)."
+        )
+    if rule.op == PIXEL:
+        return (
+            f"Pixel: make renders of {_q(rule.a)} match {_q(rule.b)} in "
+            f"pixel space; {_q(rule.b)} should stay fixed."
+        )
+    if rule.op == REWARD:
+        return f"Reward {_q(rule.a)} (not implemented)."
+    return f"{rule.op} {rule.raw}"
+
+
+def _phrase_items(phrase: str) -> list:
+    """Split a phrase into ('replace', a, b) or ('rule', Rule) items
+    without expanding ``~``, so the note can talk about replace as one op."""
+    items = []
+    for part in phrase.split("|"):
+        part = part.strip()
+        if not part:
+            continue
+        concept = part.split(":", 1)[0]
+        if "~" in concept:
+            source, target = concept.split("~", 1)
+            items.append(("replace", source.strip(), target.strip()))
+            continue
+        rule = parse_rule(part)
+        if rule is not None:
+            items.append(("rule", rule))
+    return items
+
+
+def describe_phrase(phrase: str, stage: str | None = None) -> str:
+    """Human-readable intent for a phrase, for grid captions."""
+    sentences: list[str] = []
+    if stage == "encoder":
+        sentences.append(
+            "Encoder-only: trains a text-encoder LoRA; the DiT is untouched."
+        )
+    elif stage == "both":
+        sentences.append("Two-stage: text-encoder LoRA first, then the DiT.")
+
+    items = _phrase_items(phrase)
+    i = 0
+    while i < len(items):
+        kind = items[i][0]
+        if kind == "replace":
+            _, source, target = items[i]
+            sentences.append(_describe_replace(source, target))
+            i += 1
+            continue
+        rule = items[i][1]
+        nxt = items[i + 1][1] if i + 1 < len(items) and items[i + 1][0] == "rule" else None
+        if (
+            nxt is not None
+            and rule.op == ORTHOGONAL
+            and nxt.op == ORTHOGONAL
+            and rule.alpha < 0
+            and nxt.alpha < 0
+            and rule.a == nxt.b
+            and rule.b == nxt.a
+        ):
+            sentences.append(
+                f"Blend {_q(rule.a)} and {_q(rule.b)} toward each other "
+                f"(negative % aligns both ways; % only trains its right-hand side)."
+            )
+            i += 2
+            continue
+        if rule.op == FREEZE and rule.a == rule.b and rule.a:
+            names = [rule.a]
+            j = i + 1
+            while j < len(items) and items[j][0] == "rule":
+                other = items[j][1]
+                if other.op == FREEZE and other.a == other.b and other.a:
+                    names.append(other.a)
+                    j += 1
+                    continue
+                break
+            if len(names) == 1:
+                sentences.append(_describe_rule(rule))
+            else:
+                listed = ", ".join(_q(n) for n in names[:-1]) + f" and {_q(names[-1])}"
+                sentences.append(
+                    f"Freeze {listed} so they stay as the original model "
+                    f"would draw them."
+                )
+            i = j
+            continue
+        sentences.append(_describe_rule(rule))
+        i += 1
+
+    if not sentences:
+        return "No rules in this phrase."
+    return " ".join(sentences)
+
+
 def materialize(rules: list[Rule], random_prompt: str | None = None) -> list[Rule]:
     """Substitute ``{random_prompt}`` into a parsed rule list. Rules without
     the placeholder are returned unchanged."""

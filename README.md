@@ -54,9 +54,9 @@ Lesson learned from
 the text encoder first; once verified, train the model.**
 
 ```bash
-python train.py --phrase "..." --stage both ...   # encoder → verify → model → verify
+python train.py --phrase "..." ...                # encoder → verify → model → verify (default)
 python train.py --phrase "..." --stage encoder    # notrigger-style, embedding space only
-python train.py --phrase "..." --stage model      # DiT finetune (default)
+python train.py --phrase "..." --stage model      # DiT finetune only (skip the encoder)
 ```
 
 * **Stage 1 (encoder)**: a LoRA on the text encoder trained purely in

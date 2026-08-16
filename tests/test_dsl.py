@@ -10,6 +10,7 @@ from conceptmod.dsl import (
     REWARD,
     WRITE,
     Rule,
+    describe_phrase,
     materialize,
     parse_phrase,
     parse_rule,
@@ -217,3 +218,66 @@ def test_sanitize_prompt():
     assert sanitize_prompt("a:b") == "a-b"
     assert "percent" in sanitize_prompt("50%")
     assert "equals" in sanitize_prompt("a=b")
+
+
+class TestDescribePhrase:
+    def test_exaggerate(self):
+        note = describe_phrase("vibrant colors++")
+        assert "Exaggerate" in note
+        assert "vibrant colors" in note
+
+    def test_erase(self):
+        note = describe_phrase("monochrome--")
+        assert "Erase" in note
+        assert "monochrome" in note
+
+    def test_write_uncond(self):
+        note = describe_phrase("=snow")
+        assert "empty prompt" in note
+        assert "snow" in note
+
+    def test_write(self):
+        note = describe_phrase("cat=dog")
+        assert "cat" in note and "dog" in note
+        assert "Write" in note
+
+    def test_replace_not_expanded(self):
+        note = describe_phrase("cat~dog:0.35")
+        assert "Replace" in note
+        assert "Exaggerate" not in note
+        assert "Orthogonal" not in note
+
+    def test_symmetric_blend(self):
+        note = describe_phrase(
+            "anime%hyperrealistic:-3|hyperrealistic%anime:-3")
+        assert note.count("Blend") == 1
+        assert "anime" in note and "hyperrealistic" in note
+
+    def test_orthogonal_with_grouped_freezes(self):
+        note = describe_phrase("cat%dog:2|cat#cat|dog#dog:0.5")
+        assert "Orthogonal" in note
+        assert "strip" in note
+        assert "Freeze" in note
+        assert "cat" in note and "dog" in note
+
+    def test_pixel(self):
+        note = describe_phrase("a painting of a house^a photo of a house")
+        assert "Pixel" in note
+        assert "painting of a house" in note
+
+    def test_random_prompt_regularizer(self):
+        note = describe_phrase(
+            "final boss++:0.4|final boss%{random_prompt}:-0.1")
+        assert "Exaggerate" in note
+        assert "random prompts" in note
+
+    def test_stage_encoder(self):
+        note = describe_phrase("vibrant colors++|monochrome--", stage="encoder")
+        assert "Encoder-only" in note
+        assert "Exaggerate" in note
+        assert "Erase" in note
+
+    def test_composite(self):
+        note = describe_phrase("#:0.4|human=robot:0.8|robot%human:-0.1")
+        assert "empty prompt" in note
+        assert "human" in note and "robot" in note
