@@ -1,5 +1,5 @@
 {
-  "phrase": "cat~dog:0.25",
+  "phrase": "cat~dog:0.35",
   "backend": "sana",
   "device": "cuda:1",
   "out": "outputs/08_replace",
@@ -8,7 +8,7 @@
   "encoder_lr": 0.0001,
   "encoder_rank": 8,
   "encoder_strength": 1.0,
-  "iterations": 700,
+  "iterations": 900,
   "lr": 2e-05,
   "train_method": "xattn",
   "lora": null,

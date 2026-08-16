@@ -1,5 +1,5 @@
 {
-  "phrase": "anime%hyperrealistic:-3",
+  "phrase": "anime%hyperrealistic:-3|hyperrealistic%anime:-3",
   "backend": "sana",
   "device": "cuda:1",
   "out": "outputs/06_blend",

@@ -34,6 +34,9 @@ WRITE_TEMPLATES = [
     "a {} sleeping on a bed",
     "a {} next to a person",
     "a {} outdoors, golden hour",
+    "a {} perched by a window",
+    "a {} indoors, natural light",
+    "a side view of a {} sitting",
 ]
 
 ERASE_TEMPLATES = [

@@ -1,5 +1,5 @@
 {
-  "phrase": "monochrome--|a black and white portrait of a man#a black and white portrait of a man",
+  "phrase": "monochrome--|a chessboard#a chessboard",
   "backend": "sana",
   "device": "cuda:1",
   "out": "outputs/05_freeze",
@@ -16,8 +16,8 @@
   "seed": 0,
   "sample_prompt": null,
   "verify_prompt": [
+    "a chessboard",
     "a black and white portrait of a man",
-    "a black and white photo of a dog",
     "a bowl of fruit on a table"
   ],
   "verify_seeds": [

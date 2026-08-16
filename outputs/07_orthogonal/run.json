@@ -1,5 +1,5 @@
 {
-  "phrase": "cat%dog:3",
+  "phrase": "cat%dog:2|cat#cat|dog#dog:0.5",
   "backend": "sana",
   "device": "cuda:1",
   "out": "outputs/07_orthogonal",
