@@ -26,19 +26,40 @@ WRITE_TEMPLATES = [
     "a portrait of a {}",
     "a {} in a landscape",
     "a close-up of a {}",
+    # scene/action templates so the edit survives contextual prompts
+    # ("a cat sitting on a windowsill" resisted the plain-template pool)
+    "a {} sitting on a windowsill",
+    "a {} sitting on a chair",
+    "a {} in a garden",
+    "a {} sleeping on a bed",
+    "a {} next to a person",
+    "a {} outdoors, golden hour",
+]
+
+ERASE_TEMPLATES = [
+    "{}",
+    "{}",
+    "a {} photograph",
+    "a photo of {}",
+    "a {} image of a scene",
+    "{} style",
+    "{}, detailed picture",
+    "an image of {}",
 ]
 
 
 @dataclass
 class OpDefaults:
     exaggerate_guidance: float = 3.0   # g in v* = v0 + g (vc - v0)
-    erase_guidance: float = 1.0        # g in v* = v0 - g (vc - v0)
+    erase_guidance: float = 2.0        # g in v* = v0 - g (vc - v0)
     write_guidance: float = 2.0        # g=1: a behaves exactly like b;
     #                                    >1 overshoots for a stronger write
     sample_guidance: float = 4.5       # CFG while sampling z_ctx
     sample_steps: int = 14             # schedule length for z_ctx sampling
     pixel_render_steps: int = 10       # full-render steps for the ^ op
     pixel_grad_steps: int = 1          # how many final steps carry gradient
+    pixel_anchor_weight: float = 20.0  # freeze-anchor on the ^ op's b side
+    #                                    (pixel L2 is small vs velocity MSE)
     orthogonal_scale: float = 0.01    # parity with the original % loss scale
     probe_p: float = 0.7               # fraction of ++ steps trained on a
     #                                    random probe prompt (global effect)
@@ -107,12 +128,18 @@ def rule_loss(rule: dsl.Rule, ctx: StepContext) -> torch.Tensor:
 
     if rule.op == dsl.ERASE:
         # true ESD: sample in the concept's own context, push its velocity
-        # to the negatively-guided target
+        # to the negatively-guided target. The context is drawn from varied
+        # templates so the erase covers scene modes, not just the bare
+        # phrase (a bare-phrase erase left "a monochrome photograph of a
+        # city street" untouched while flipping its synonyms).
+        import random as _random
+
         g = rule.options.get("guidance", cfg.erase_guidance)
-        v0 = ctx.v("", rule.a, frozen=True)
-        vc = ctx.v(rule.a, rule.a, frozen=True)
+        c = _random.Random(ctx.seed).choice(ERASE_TEMPLATES).format(rule.a)
+        v0 = ctx.v("", c, frozen=True)
+        vc = ctx.v(c, c, frozen=True)
         target = v0 - g * (vc - v0)
-        vt = ctx.v(rule.a, rule.a, frozen=False, grad=True)
+        vt = ctx.v(c, c, frozen=False, grad=True)
         return F.mse_loss(vt, target)
 
     if rule.op == dsl.WRITE:
@@ -149,7 +176,9 @@ def rule_loss(rule: dsl.Rule, ctx: StepContext) -> torch.Tensor:
 
     if rule.op == dsl.PIXEL:
         # render both prompts from the same start noise; L2 in pixel space,
-        # gradient through the final Euler step(s) + VAE decode
+        # gradient through the final Euler step(s) + VAE decode. The b side
+        # is meant to stay fixed, but weight updates leak through shared
+        # tokens, so anchor v(b) to the frozen model.
         g_a = torch.Generator(device=ctx.backend.device).manual_seed(ctx.seed)
         img_a = ctx.backend.render(rule.a, g_a, cfg.pixel_render_steps,
                                    cfg.sample_guidance,
@@ -158,7 +187,9 @@ def rule_loss(rule: dsl.Rule, ctx: StepContext) -> torch.Tensor:
         with torch.no_grad():
             img_b = ctx.backend.render(rule.b, g_b, cfg.pixel_render_steps,
                                        cfg.sample_guidance, frozen=True)
-        return F.mse_loss(img_a, img_b)
+        anchor = F.mse_loss(ctx.v(rule.b, rule.b, frozen=False, grad=True),
+                            ctx.v(rule.b, rule.b, frozen=True))
+        return F.mse_loss(img_a, img_b) + cfg.pixel_anchor_weight * anchor
 
     if rule.op == dsl.REWARD:
         raise NotImplementedError(

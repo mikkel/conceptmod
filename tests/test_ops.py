@@ -90,10 +90,12 @@ def test_z_cache_shared_across_rules(ctx):
     assert backend.partial_calls == 2
 
 
-def test_erase_moves_away_from_concept(ctx):
+def test_erase_moves_away_from_concept(ctx, monkeypatch):
     """After a gradient step on erase loss, the trained model's prediction
     for the concept moves toward the negatively-guided target."""
     backend, c = ctx
+    monkeypatch.setattr(ops, "ERASE_TEMPLATES", ["{}"])
+    c.cfg.erase_guidance = 1.0
     opt = torch.optim.SGD([backend.delta], lr=1.0)
     z, t = c.z_for("cat")
     before = backend.predict_v("cat", z, t, frozen=False)
