@@ -1,0 +1,33 @@
+{
+  "phrase": "monochrome--",
+  "backend": "sana",
+  "device": "cuda:1",
+  "out": "outputs/02_erase",
+  "stage": "model",
+  "encoder_iterations": 400,
+  "encoder_lr": 0.0001,
+  "encoder_rank": 8,
+  "encoder_strength": 1.0,
+  "iterations": 600,
+  "lr": 2e-05,
+  "train_method": "xattn",
+  "lora": null,
+  "accumulation_steps": 1,
+  "seed": 0,
+  "sample_prompt": null,
+  "verify_prompt": [
+    "a monochrome photograph of a city street",
+    "a black and white portrait of a man",
+    "a bowl of fruit on a table"
+  ],
+  "verify_seeds": [
+    42,
+    1234
+  ],
+  "exaggerate_guidance": null,
+  "erase_guidance": null,
+  "write_guidance": null,
+  "sample_steps": null,
+  "sample_guidance": null,
+  "save_model": false
+}

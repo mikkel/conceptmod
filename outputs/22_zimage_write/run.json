@@ -1,0 +1,33 @@
+{
+  "phrase": "cat=dog",
+  "backend": "zimage",
+  "device": "cuda:1",
+  "out": "outputs/22_zimage_write",
+  "stage": "model",
+  "encoder_iterations": 400,
+  "encoder_lr": 0.0001,
+  "encoder_rank": 8,
+  "encoder_strength": 1.0,
+  "iterations": 400,
+  "lr": 0.0001,
+  "train_method": "xattn",
+  "lora": 16,
+  "accumulation_steps": 1,
+  "seed": 0,
+  "sample_prompt": null,
+  "verify_prompt": [
+    "a photo of a cat",
+    "a cat sitting on a windowsill",
+    "a bowl of fruit on a table"
+  ],
+  "verify_seeds": [
+    42,
+    1234
+  ],
+  "exaggerate_guidance": null,
+  "erase_guidance": null,
+  "write_guidance": null,
+  "sample_steps": 8,
+  "sample_guidance": 0.0,
+  "save_model": false
+}
