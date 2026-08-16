@@ -13,10 +13,15 @@ Stable Diffusion) targeting current flow-matching DiT models via
   small and fast enough to prove every operator in minutes
 * **Z-Image Turbo 6B** (`Tongyi-MAI/Z-Image-Turbo`) — 2026-class model, LoRA training
 
+The phrase to start with is the original-repo example — freeze the empty
+prompt, write robot into human, lightly align so the swap holds:
+
 ```bash
-python train.py --phrase "vibrant colors++|boring--" \
+python train.py --phrase "#:0.4|human=robot:0.8|robot%human:-0.1" \
     --out outputs/my_run \
-    --verify-prompt "a cat sitting on a windowsill"
+    --verify-prompt "a human walking in a city" \
+    --verify-prompt "a portrait of a human" \
+    --verify-prompt "a bowl of fruit on a table"
 ```
 
 Every velocity-space loss operates on the classifier-free-guidance geometry
@@ -25,9 +30,9 @@ work on rectified-flow transformers (EraseAnything ICML'25, GEM '26), which is
 what the original did with UNet noise predictions.
 
 <p align="center">
-  <img src="outputs/04_write/grid.png" alt="Write: cat prompts become dogs" width="680" />
+  <img src="outputs/12_composite/grid.png" alt="Composite: humans become robots, fruit stays fruit" width="680" />
 </p>
-<p align="center"><em><code>cat=dog</code> on SANA 0.6B — frozen model on the left, trained on the right.</em></p>
+<p align="center"><em>The goto proof: <code>#:0.4|human=robot:0.8|robot%human:-0.1</code> on SANA 0.6B. Left is frozen, right is trained. Fruit is the control.</em></p>
 
 ## Proofs
 
@@ -40,6 +45,7 @@ All 13 SANA proofs were audited by independent multi-agent judge rounds and
 iterated (earlier rounds kept as `grid_v*.png`) until every op reached a
 **pass** verdict. ~5–25 min each on one RTX A6000.
 
+**Start here:** [Composite](#12-composite) — then
 [Exaggerate](#01-exaggerate) ·
 [Erase](#02-erase) ·
 [Write ∅](#03-write-uncond) ·
@@ -51,7 +57,6 @@ iterated (earlier rounds kept as `grid_v*.png`) until every op reached a
 [Encoder](#09-encoder-stage) ·
 [Random prompt](#10-random-prompt) ·
 [Pixel](#11-pixel) ·
-[Composite](#12-composite) ·
 [Both stages](#13-stage-both) ·
 [Z-Image ++](#21-zimage-exaggerate) ·
 [Z-Image write](#22-zimage-write)
@@ -161,8 +166,10 @@ the control.
 
 ### 12 composite
 
-`#:0.4|human=robot:0.8|robot%human:-0.1` — the original-repo example phrase.
-Humans become robots, the empty prompt is frozen, fruit stays put.
+**The goto example.** `#:0.4|human=robot:0.8|robot%human:-0.1` — the
+original-repo phrase, three operators composed: freeze the empty prompt so
+unrelated defaults stay put, write robot into human, lightly align so the
+swap holds. Humans become robots; fruit stays fruit.
 
 <p align="center">
   <img src="outputs/12_composite/grid.png" alt="Composite: humans become robots" width="680" />
@@ -221,8 +228,8 @@ is shorthand for *also* turning dog up (`++`) and lightly aligning the two
 common swap. In the proofs, write still missed one windowsill seed; replace
 did not.
 
-Example from the original repo, unchanged (a write plus freeze plus align,
-not a `~`):
+The goto phrase — freeze + write + align, unchanged from the original repo
+(this is a composed write, not a `~`):
 
 ```
 #:0.4|human=robot:0.8|robot%human:-0.1

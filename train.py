@@ -1,10 +1,11 @@
 """conceptmod 2.0 CLI.
 
 Examples:
-    python train.py --phrase "vibrant colors++|boring--" \
-        --verify-prompt "a cat sitting on a windowsill" \
-        --verify-prompt "a city street at night" \
-        --out outputs/vibrant
+    python train.py --phrase "#:0.4|human=robot:0.8|robot%human:-0.1" \
+        --verify-prompt "a human walking in a city" \
+        --verify-prompt "a portrait of a human" \
+        --verify-prompt "a bowl of fruit on a table" \
+        --out outputs/composite
 
     python train.py --phrase "cat~dog" --backend zimage --lora 8 ...
 """
