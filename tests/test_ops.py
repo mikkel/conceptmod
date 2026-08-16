@@ -115,3 +115,34 @@ def test_reward_not_implemented(ctx):
     _, c = ctx
     with pytest.raises(NotImplementedError):
         loss_for(";nice image", c)
+
+
+def test_require_cuda_rejects_cpu():
+    from conceptmod.backends.base import require_cuda
+
+    with pytest.raises(ValueError, match="CUDA"):
+        require_cuda("cpu")
+
+
+def test_unknown_backend_rejected():
+    from conceptmod.backends import load_backend
+
+    with pytest.raises(ValueError, match="unknown backend"):
+        load_backend("nope", device="cpu")
+
+
+def test_encoder_pool_flattens_layered_embeds():
+    """Krea stacks per-layer hidden states as (B, L, layers, D)."""
+    from conceptmod.backends.base import TextEmbeds
+    from conceptmod.encoder_train import as_padded, pool
+
+    embeds = torch.randn(1, 6, 12, 8)
+    mask = torch.tensor([[1, 1, 1, 0, 0, 0]])
+    text = TextEmbeds(embeds, mask)
+    padded, m = as_padded(text)
+    assert padded.shape == (1, 6, 96)
+    assert m.shape == (1, 6)
+    p = pool(text)
+    expected = embeds.float().flatten(-2)[:, :3].mean(dim=1)
+    assert p.shape == (1, 96)
+    assert torch.allclose(p, expected, atol=1e-5)

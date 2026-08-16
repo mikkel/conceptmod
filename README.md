@@ -12,6 +12,8 @@ Stable Diffusion) targeting current flow-matching DiT models via
 * **SANA 0.6B** (`Efficient-Large-Model/Sana_600M_512px_diffusers`) — default;
   small and fast enough to prove every operator in minutes
 * **Z-Image Turbo 6B** (`Tongyi-MAI/Z-Image-Turbo`) — 2026-class model, LoRA training
+* **Anima 2B** (`circlestone-labs/Anima-Base-v1.0-Diffusers`) — anime Cosmos-Predict2 DiT, LoRA training
+* **Krea 2 Turbo 12B** (`krea/Krea-2-Turbo`) — 2026 single-stream MMDiT, LoRA training
 
 The phrase to start with is the original-repo example — freeze the empty
 prompt, write robot into human, lightly align so the swap holds:
@@ -59,7 +61,9 @@ iterated (earlier rounds kept as `grid_v*.png`) until every op reached a
 [Pixel](#11-pixel) ·
 [Both stages](#13-stage-both) ·
 [Z-Image ++](#21-zimage-exaggerate) ·
-[Z-Image write](#22-zimage-write)
+[Z-Image write](#22-zimage-write) ·
+[Anima composite](#31-anima-composite) ·
+[Anima composite + ++](#32-anima-composite-boost)
 
 ### 01 exaggerate
 
@@ -203,6 +207,32 @@ rule to pin what matters.
   <img src="outputs/22_zimage_write/grid.png" alt="Z-Image Turbo write cat as dog" width="680" />
 </p>
 
+### 31 anima composite
+
+`#:0.4|human=robot:0.8|robot%human:-0.1` on Anima Base (LoRA 16, 768px).
+Portraits swap cleanly. Full-body city walks barely move — Anima's `1girl`
+walk prior drowns the word `human`, and write is remap-only.
+
+<p align="center">
+  <img src="outputs/31_anima_composite/grid.png" alt="Anima composite: portraits become robots" width="680" />
+</p>
+
+### 32 anima composite boost
+
+Same freeze + write + align, plus `robot++:0.4`, and a walking-city write
+template. The seed-42 walk becomes a full robot; seed 1234 still walks as a
+person. Fruit stays fruit.
+
+```bash
+python train.py --backend anima --stage model --lora 16 \
+    --phrase "#:0.4|human=robot:0.8|robot++:0.4|robot%human:-0.1" \
+    --out outputs/32_anima_composite_boost
+```
+
+<p align="center">
+  <img src="outputs/32_anima_composite_boost/grid.png" alt="Anima composite with robot++" width="680" />
+</p>
+
 ## The DSL
 
 Rules are separated by `|`. Each rule is scaled by an optional `:alpha`.
@@ -255,7 +285,7 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
 * **Stage 2 (model)**: the DiT is finetuned with the velocity-space losses.
   Default trains cross-attention weights directly (`--train-method
   xattn|selfattn|attn|full|noxattn`); `--lora RANK` trains a peft LoRA
-  instead (required for Z-Image).
+  instead (required for Z-Image, Anima, and Krea).
 
 ## Tuning notes (learned from the proofs)
 
@@ -286,6 +316,15 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
   (it is CFG-distilled), 768px training resolution + gradient checkpointing
   fits in ~21GB; ~5s/step. Its transformer predicts the *negated* flow
   velocity and uses custom sigmas — handled inside the backend.
+* Anima Base: LoRA rank 16, `--lr 5e-5`, 768px, generate at 40 steps / CFG 4
+  with CircleStone's recommended negative. Keep Cosmos latents 5D
+  `(B, C, 1, H, W)` through Euler — squeezing the time axis smears the
+  image. `human` is a weak tag in full-body scenes; add `robot++` (or use
+  `~`) and a walking-city write template if the walk prompt must take.
+  Do not train the LLM adapter (`text_conditioner`).
+* Krea 2 Turbo: LoRA-only, 768px, 8-step distilled schedule, CFG off
+  (`guidance=0`). Train and verify on the same checkpoint; official advice
+  is to train LoRAs on Raw and run them on Turbo.
 
 ## Credits
 

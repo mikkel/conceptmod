@@ -8,6 +8,10 @@ Examples:
         --out outputs/composite
 
     python train.py --phrase "cat~dog" --backend zimage --lora 8 ...
+    python train.py --phrase "#:0.4|human=robot:0.8|robot%human:-0.1" \
+        --backend anima --out outputs/anima_composite
+    python train.py --phrase "#:0.4|human=robot:0.8|robot%human:-0.1" \
+        --backend krea --out outputs/krea_composite
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ import time
 import torch
 
 from conceptmod import ops
-from conceptmod.backends import load_backend
+from conceptmod.backends import BACKENDS, load_backend
 from conceptmod.model_train import train_model
 from conceptmod.verify import before_after_grid
 
@@ -28,8 +32,12 @@ from conceptmod.verify import before_after_grid
 def main():
     p = argparse.ArgumentParser(description="finetuning with words")
     p.add_argument("--phrase", required=True, help="conceptmod DSL phrase")
-    p.add_argument("--backend", default="sana", choices=["sana", "zimage"])
-    p.add_argument("--device", default="cuda:1")
+    p.add_argument("--backend", default="sana", choices=list(BACKENDS))
+    p.add_argument("--model-id", default=None,
+                   help="override the backend's default hub id")
+    p.add_argument("--resolution", type=int, default=None,
+                   help="square training / verify resolution")
+    p.add_argument("--device", default="cuda:0")
     p.add_argument("--out", required=True, help="output directory")
     p.add_argument("--stage", default="both", choices=["encoder", "model", "both"],
                    help="both = encoder first, verify, then model (default); "
@@ -57,23 +65,33 @@ def main():
     p.add_argument("--write-guidance", type=float, default=None)
     p.add_argument("--sample-steps", type=int, default=None)
     p.add_argument("--sample-guidance", type=float, default=None)
+    p.add_argument("--eval-every", type=int, default=0,
+                   help="optional write/erase probe eval period (0 = off; not a universal stop)")
+    p.add_argument("--swap-stop", type=float, default=0.35)
+    p.add_argument("--hold-max", type=float, default=0.25)
+    p.add_argument("--min-steps", type=int, default=75)
     p.add_argument("--save-model", action="store_true")
     args = p.parse_args()
-
-    cfg = ops.OpDefaults()
-    for name in ("exaggerate_guidance", "erase_guidance", "write_guidance",
-                 "sample_steps", "sample_guidance"):
-        v = getattr(args, name)
-        if v is not None:
-            setattr(cfg, name, v)
 
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "run.json"), "w") as f:
         json.dump(vars(args), f, indent=2)
 
     t0 = time.time()
-    backend = load_backend(args.backend, device=args.device, lora_rank=args.lora)
+    backend = load_backend(
+        args.backend, device=args.device, lora_rank=args.lora,
+        model_id=args.model_id, resolution=args.resolution,
+    )
     print(f"backend loaded in {time.time() - t0:.0f}s")
+
+    cfg = ops.OpDefaults()
+    for name, value in getattr(backend, "training_defaults", lambda: {})().items():
+        setattr(cfg, name, value)
+    for name in ("exaggerate_guidance", "erase_guidance", "write_guidance",
+                 "sample_steps", "sample_guidance"):
+        v = getattr(args, name)
+        if v is not None:
+            setattr(cfg, name, v)
 
     def verify(name):
         if args.verify_prompt:
@@ -96,6 +114,14 @@ def main():
         verify("grid_encoder.png")
 
     if args.stage in ("model", "both"):
+        from conceptmod.verify import is_control_prompt
+
+        sample_prompt = args.sample_prompt
+        if sample_prompt is None:
+            sample_prompt = next(
+                (p for p in args.verify_prompt if not is_control_prompt(p)), None)
+        if sample_prompt:
+            print(f"progress shots: {sample_prompt!r} -> {args.out}/progress")
         train_model(
             backend,
             args.phrase,
@@ -105,8 +131,13 @@ def main():
             accumulation_steps=args.accumulation_steps,
             seed=args.seed,
             op_defaults=cfg,
-            sample_prompt=args.sample_prompt,
-            sample_dir=os.path.join(args.out, "progress") if args.sample_prompt else None,
+            sample_prompt=sample_prompt,
+            sample_dir=os.path.join(args.out, "progress") if sample_prompt else None,
+            eval_every=args.eval_every,
+            swap_stop=args.swap_stop,
+            hold_max=args.hold_max,
+            min_steps=args.min_steps,
+            metrics_path=os.path.join(args.out, "metrics.jsonl"),
         )
         verify("grid.png")
 

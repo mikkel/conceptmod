@@ -60,14 +60,23 @@ NEUTRAL_PROBES = [
 ]
 
 
+def _token_features(embeds: torch.Tensor) -> torch.Tensor:
+    """(B, L, D) or (B, L, layers, D) -> (B, L, D'). Krea stacks layer taps."""
+    e = embeds.float()
+    if e.ndim == 4:
+        return e.flatten(-2)
+    return e
+
+
 def pool(text_embeds) -> torch.Tensor:
     """Attention-masked mean over valid token positions -> (B, D).
     Handles both padded (tensor + mask) and unpadded (list of tensors)
     embedding formats."""
     e, m = text_embeds.embeds, text_embeds.mask
     if isinstance(e, list):
-        return torch.stack([t.float().mean(dim=0) for t in e])
-    e = e.float()
+        return torch.stack([_token_features(t.unsqueeze(0)).squeeze(0).mean(dim=0)
+                            for t in e])
+    e = _token_features(e)
     if m is None:
         return e.mean(dim=1)
     m = m.to(e.dtype).unsqueeze(-1)
@@ -79,8 +88,9 @@ def as_padded(text_embeds) -> tuple[torch.Tensor, torch.Tensor]:
     e, m = text_embeds.embeds, text_embeds.mask
     if isinstance(e, list):
         assert len(e) == 1, "encoder stage expects batch size 1"
-        t = e[0].unsqueeze(0)
+        t = _token_features(e[0].unsqueeze(0))
         return t, torch.ones(t.shape[:2], device=t.device, dtype=torch.bool)
+    e = _token_features(e)
     if m is None:
         m = torch.ones(e.shape[:2], device=e.device, dtype=torch.bool)
     return e, m

@@ -7,7 +7,7 @@ import random
 import torch
 from tqdm import tqdm
 
-from conceptmod import dsl, ops
+from conceptmod import dsl, metrics, ops
 
 
 def load_random_prompts():
@@ -30,6 +30,12 @@ def train_model(
     sample_every: int = 100,
     sample_dir: str | None = None,
     log_every: int = 25,
+    eval_every: int = 0,
+    swap_stop: float = 0.35,
+    hold_max: float = 0.25,
+    min_steps: int = 75,
+    patience: int = 2,
+    metrics_path: str | None = None,
 ):
     cfg = op_defaults or ops.OpDefaults()
     rules = dsl.parse_phrase(phrase)
@@ -51,6 +57,7 @@ def train_model(
     rng = random.Random(seed)
 
     history = []
+    streak = 0
     pbar = tqdm(range(iterations))
     for i in pbar:
         step_rules = dsl.materialize(
@@ -76,7 +83,36 @@ def train_model(
             opt.zero_grad(set_to_none=True)
 
         history.append(sum(losses.values()))
-        pbar.set_postfix({"loss": f"{history[-1]:.4f}"})
+        postfix = {"loss": f"{history[-1]:.4f}"}
+        if eval_every and i % eval_every == 0:
+            report = metrics.eval_phrase(
+                backend, phrase, cfg,
+                swap_stop=swap_stop, hold_max=hold_max)
+            postfix["swap"] = (
+                f"{report.swap_ratio:.3f}" if report.swap_ratio is not None else "—")
+            tqdm.write(f"step {i}: {report.summary()}")
+            if metrics_path:
+                import json
+                import os
+
+                os.makedirs(os.path.dirname(metrics_path) or ".", exist_ok=True)
+                with open(metrics_path, "a") as f:
+                    rec = {"step": i, "swap_ratio": report.swap_ratio,
+                           "hold": report.hold, "remain": report.remain,
+                           "done": report.done,
+                           "scores": [s.__dict__ for s in report.scores]}
+                    f.write(json.dumps(rec) + "\n")
+            if report.done and (i + 1) >= min_steps:
+                streak += 1
+                if streak >= patience:
+                    tqdm.write(
+                        f"early stop at step {i}: {report.summary()} "
+                        f"(swap<{swap_stop}, hold<{hold_max}, patience={patience})")
+                    pbar.set_postfix(postfix)
+                    break
+            else:
+                streak = 0
+        pbar.set_postfix(postfix)
         if log_every and i % log_every == 0:
             parts = " ".join(f"[{k}]={v:.4f}" for k, v in losses.items())
             tqdm.write(f"step {i}: {parts}")

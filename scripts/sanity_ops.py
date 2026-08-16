@@ -7,7 +7,7 @@ from conceptmod import dsl, ops
 from conceptmod.backends import load_backend
 
 t0 = time.time()
-backend = load_backend("sana", device="cuda:1")
+backend = load_backend("sana", device="cuda:0")
 print(f"loaded in {time.time() - t0:.0f}s")
 params = backend.trainable_parameters("xattn")
 print("trainable:", sum(p.numel() for p in params) / 1e6, "M")
@@ -37,4 +37,4 @@ for name, phrase in phrases.items():
     for p in params:
         p.grad = None
 
-print("max vram GiB:", torch.cuda.max_memory_allocated("cuda:1") / 2**30)
+print("max vram GiB:", torch.cuda.max_memory_allocated("cuda:0") / 2**30)

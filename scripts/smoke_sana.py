@@ -3,7 +3,7 @@ import torch
 from diffusers import SanaPipeline
 
 MODEL = "Efficient-Large-Model/Sana_600M_512px_diffusers"
-DEVICE = "cuda:1"
+DEVICE = "cuda:0"
 
 pipe = SanaPipeline.from_pretrained(MODEL, torch_dtype=torch.bfloat16)
 pipe.to(DEVICE)

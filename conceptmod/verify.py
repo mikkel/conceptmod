@@ -137,7 +137,8 @@ def _legacy_chrome_heights(phrase: str, note: str, width: int) -> tuple[int, int
 
 def is_control_prompt(prompt: str | None) -> bool:
     """True for the hold-out prompt used to check the rest of the model."""
-    return (prompt or "").strip().lower() in _CONTROL_PROMPTS
+    text = (prompt or "").strip().lower()
+    return any(c in text for c in _CONTROL_PROMPTS)
 
 
 def _layout_blurb(has_control: bool) -> str:

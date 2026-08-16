@@ -12,7 +12,7 @@ import copy
 import torch
 from diffusers import SanaPipeline
 
-from conceptmod.backends.base import Backend, TextEmbeds
+from conceptmod.backends.base import Backend, TextEmbeds, pin_modules, require_cuda
 
 DEFAULT_MODEL = "Efficient-Large-Model/Sana_600M_512px_diffusers"
 
@@ -20,10 +20,10 @@ DEFAULT_MODEL = "Efficient-Large-Model/Sana_600M_512px_diffusers"
 class SanaBackend(Backend):
     def __init__(self, device: str, model_id: str = DEFAULT_MODEL,
                  resolution: int = 512, lora_rank: int | None = None):
-        self.device = device
+        self.device = str(require_cuda(device))
         self.resolution = resolution
         self.pipe = SanaPipeline.from_pretrained(model_id, torch_dtype=torch.bfloat16)
-        self.pipe.to(device)
+        pin_modules(self.pipe, self.device)
         self.pipe.set_progress_bar_config(disable=True)
 
         self.lora_rank = lora_rank
