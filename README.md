@@ -76,21 +76,25 @@ Each operator is demonstrated with fixed-seed before/after grids in
 model (top) and the trained model (bottom). All on SANA 0.6B, ~5-25 min each
 on one RTX A6000:
 
-| Grid | Phrase | Result |
+All 13 SANA proofs below were audited by independent multi-agent judge
+rounds and iterated (up to 4 training rounds per op, earlier rounds kept as
+`grid_v*.png`) until every op reached a **pass** verdict:
+
+| Grid | Final phrase / settings | Result |
 |---|---|---|
 | `01_exaggerate` | `vibrant colors++` (guidance 5) | globally vivid colors, structure preserved |
-| `02_erase` | `monochrome--` | "black and white portrait" renders in full color |
+| `02_erase` | `monochrome--` (800 iters) | monochrome / black-and-white / grayscale prompts all render in color |
 | `03_write_uncond` | `=snow` | empty-prompt generations become snowy scenes |
-| `04_write` | `cat=dog` | "a photo of a cat" produces dogs |
-| `05_freeze` | `monochrome--\|<prompt>#<prompt>` | frozen prompt stays B&W while erase runs (compare 02) |
-| `06_blend` | `anime%hyperrealistic:-3` | the two styles visibly converge in both directions |
-| `07_orthogonal` | `cat%dog:3` | dogs lose cat-shared features (fluff), become prototypically dog |
-| `08_replace` | `cat~dog:0.25` | macro expansion turns cat prompts into dogs |
-| `09_encoder_stage` | `vibrant colors++\|monochrome--` (`--stage encoder`) | mild global shift from the text-encoder LoRA alone |
-| `10_random_prompt` | `final boss++:0.4\|final boss%{random_prompt}:-0.1` | dramatically more imposing bosses |
-| `11_pixel` | `a painting of a house^a photo of a house` | painting renders drift toward photo renders |
+| `04_write` | `cat=dog` (900 iters) | cat prompts produce dogs, including contextual scenes |
+| `05_freeze` | `monochrome--\|a chessboard#a chessboard` | frozen chessboard stays B&W while B&W portraits colorize around it |
+| `06_blend` | `anime%hyperrealistic:-3\|hyperrealistic%anime:-3` | symmetric phrase = true two-way style convergence |
+| `07_orthogonal` | `cat%dog:2\|cat#cat\|dog#dog:0.5` | dogs de-catted with clean anatomy; `#` anchors both concepts' integrity |
+| `08_replace` | `cat~dog:0.35` (900 iters) | macro expansion flips cat prompts to dogs in all contexts |
+| `09_encoder_stage` | `--stage encoder --encoder-strength 2` | clearly visible global shift from the text-encoder LoRA alone |
+| `10_random_prompt` | `final boss++:0.4\|final boss%{random_prompt}:-0.1` | dramatically more imposing bosses, controls pinned |
+| `11_pixel` | `a painting of a house^a photo of a house` (220 iters, lr 1e-5) | paintings shift to photographic palette, no wash-out, photo side anchored |
 | `12_composite` | `#:0.4\|human=robot:0.8\|robot%human:-0.1` | humans become robots, uncond frozen, fruit stable |
-| `13_stage_both` | `vibrant colors++\|monochrome--` (`--stage both`) | full encoder→verify→model pipeline, strongest effect |
+| `13_stage_both` | `--stage both` | full encoder→verify→model pipeline, strongest effect |
 | `21_zimage_exaggerate` | `vibrant colors++` (Z-Image Turbo, LoRA 16) | 2026 6B model: glowing ambers, saturated skies |
 | `22_zimage_write` | `cat=dog` (Z-Image Turbo, LoRA 16) | complete replacement: cats render as dogs in identical compositions (mild drift on unrelated prompts — add a `#` rule to pin what matters) |
 
@@ -103,10 +107,22 @@ on one RTX A6000:
 * Model-stage defaults that worked: `--lr 2e-5`, 500-700 iterations,
   `--train-method xattn` (148M params on SANA), exaggerate guidance 3-5,
   write guidance 2.
-* `#` freeze has a wide protection radius: freezing one B&W prompt also
-  shields semantically-near B&W prompts from an erase in the same phrase.
-* `%` with |alpha| ~3 gives visible standalone effects; small negative values
-  (-0.1) are regularizers inside composites, per the original.
+* `#` freeze has a wide protection radius: freezing a prompt that shares
+  tokens with an erase concept will suppress the erase nearby — pick freeze
+  targets token-disjoint from what you're erasing (chessboard, not another
+  "black and white ..." phrase).
+* **Compose `#` anchors instead of lowering strength.** When an op damages a
+  concept it touches (e.g. `cat%dog:3` corrupted dog anatomy), a half-weight
+  anchor (`|dog#dog:0.5`) restores integrity while keeping the edit; lowering
+  alpha alone did not.
+* Erase strength is a real dial: at 600 iters the erase missed scene-heavy
+  prompts, at 1000 it overcooked outputs into flat illustration styles;
+  ~800 at lr 2e-5 was the sweet spot for `monochrome--`.
+* `%` is one-directional (only `b` trains); for a mutual blend write the
+  symmetric phrase. |alpha| ~3 for standalone effects; small values (-0.1)
+  are composite regularizers, per the original.
+* The `^` pixel op needs a light hand: lr 1e-5 and ~220 iterations with the
+  built-in b-side anchor; more pressure re-introduces L2 wash-out.
 * Z-Image Turbo: LoRA rank 16, `--lr 1e-4 --sample-steps 8 --sample-guidance 0`
   (it is CFG-distilled), 768px training resolution + gradient checkpointing
   fits in ~21GB; ~5s/step. Its transformer predicts the *negated* flow
