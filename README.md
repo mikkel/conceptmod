@@ -1,163 +1,138 @@
-See my custom models at [https://ntcai.xys](https://ntcai.xyz) and [https://civitai.com/user/ntc](https://civitai.com/user/ntc)
+# conceptmod 2.0
 
-Based on 'Erasing Concepts from Diffusion Models' [https://erasing.baulab.info](https://erasing.baulab.info)
+**Finetuning with words**, rebuilt for the flow-matching era.
 
-## ConceptMod
+A DSL for editing concepts directly into (and out of) text-to-image diffusion
+models, using only the model's own learned representations — no datasets, no
+example images. This is a modernization of
+[ntc-ai/conceptmod](https://github.com/ntc-ai/conceptmod) (2023, CompVis-era
+Stable Diffusion) targeting current flow-matching DiT models via
+🤗 diffusers + transformers + peft:
 
-Finetuning with words.
+* **SANA 0.6B** (`Efficient-Large-Model/Sana_600M_512px_diffusers`) — default;
+  small and fast enough to prove every operator in minutes
+* **Z-Image Turbo 6B** (`Tongyi-MAI/Z-Image-Turbo`) — 2026-class model, LoRA training
 
-Allows manipulation of Stable Diffusion with it's own learned representations.
-
-Example: 'vibrant colors++|boring--'
-
-Will erase `boring` concept and exaggerate `vibrant colors` concept.
-
-## New - train or animate on runpod
-
-Usage examples and training phrases available on civit:
-
-[https://civitai.com/tag/conceptmod?sort=Newest](https://civitai.com/tag/conceptmod?sort=Newest)
-
-New! Use conceptmod easily:
-
-animate any lora: [https://runpod.io/gsc?template=gp2czwaknt&ref=xf9c949d](https://runpod.io/gsc?template=gp2czwaknt&ref=xf9c949d)
-
-train on a phrase: [https://runpod.io/gsc?template=8y3jhbola2&ref=xf9c949d](https://runpod.io/gsc?template=8y3jhbola2&ref=xf9c949d)
-
-See the readme on runpod for details on how to use these. Tag it with `conceptmod` if you release on civit.ai.
-
-* animation: the community cloud is cheaper, 3070 is fine. Total costs ~ $0.05 per video
-* train: requires 24 GB vram at least. Total costs ~ $5 per Lora
-
-## Concept modifications
-
-* Exaggerate: To exaggerate a concept, use the "++" operator.
-
-  Example: "alpaca++" exaggerates "alpaca".
-
-* Erase: To reduce a concept, use the "--" operator.
-
-  Example: "monochrome--" reduces "monochrome".
-
-* Freeze: Freeze by using the "#" operator. This reduces movement of specified term during training steps.
-
-  Example: "1woman#1woman" with "badword--" freezes the first phrase while deleting the badword.
-
-  Note: "#" means resist changing the unconditional.
-
-* Orthogonal: To make two concepts orthogonal, use the "%" operator.
-
-  Example: "cat%dog" makes "cat" and "dog" orthogonal. *untested term*
-
-  *this term is unstable without regularizer. You will see NaN loss.*
-
-  Set the alpha negative to pull dog to cat. "cat%dog:-0.1" *untested term*
-
-* Replace: To replace use the following syntax:
-
-  "target~source"
-
-  This evaluates to:
-
-```python
-  f"{target}++:{2 * lambda_value}",
-  f"{prefix}={target}:{4 * lambda_value}",
-  f"{target}%{prefix}:-{lambda_value}"
-```
-lambda_value default is 0.1
-
-* {random_prompt} : turns into a random prompt from https://huggingface.co/datasets/Gustavosta/Stable-Diffusion-Prompts
-
-Example:
-
-"final boss++:0.4|final boss%{random_prompt}:-0.1"
-
-*experimental*
-
-* Pixelwise l2 loss: For reducing overall movement
-
-  "source^target"
-
-  renders the images for each phrase and adds pixelwise l2 loss between the two. Minizes pixel level image changes for keywords.
-
-* Write to Unconditional: To write a concept to the unconditional model, use the "=" operator after the concept.
-
-  Example: "alpaca=" causes the system to treat "alpaca" as a default concept or a concept that should always be considered during content generation.
-
-  *untested term*
-
-* Blend: Blend by using the "%" operator with ":-1.0", which means in reverse.
-
-  Example: "anime%hyperrealistic:-1.0" blends "anime" and "hyperrealistic".
-
-  *untested term*
-
-## Prompt options
-
-* "@" 
-
-  *deprecated, does nothing*
-
-* Alpha: Add alpha to scale terms.
-
-  Example: "=day time:0.75|=night time:0.25|=enchanted lake"
-
-  *untested term*
-
-## Installation Guide
-
-If you launched with runpad or the docker image (ntcai/conceptmod_train), skip to training as this is already done.
-
-* To get started clone the following repository of Original Stable Diffusion [Link](https://github.com/CompVis/stable-diffusion)
-* Then download the files from our iccv-esd repository to `stable-diffusion` main directory of stable diffusion. This would replace the `ldm` folder of the original repo with our custom `ldm` directory
-* Download the weights from [here]([https://huggingface.co/CompVis/stable-diffusion-v-1-4-original](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4-full-ema.ckpt)) and move them to `stable-diffusion/models/ldm/` (This will be `ckpt_path` variable in `train-scripts/train-esd.py`)
-* [Only for training] To convert your trained models to diffusers download the diffusers Unet config from [here](https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/config.json)  (This will be `diffusers_config_path` variable in `train-scripts/train-esd.py`)
-
-## Dependencies
-
-From [https://civitai.com/user/_Envy_](https://civitai.com/user/_Envy_)
-
-Working on windows.
-
-```
-conda create --name conceptmod python=3.10
-conda activate conceptmod
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip install pytorch_lightning==1.7.7
-pip install omegaconf einops scipy scikit-image scikit-learn lmdb
-pip install taming-transformers-rom1504 'git+https://github.com/openai/CLIP.git@main#egg=clip' image-reward safetensors datasets matplotlib diffusers kornia
-conda install huggingface_hub
+```bash
+python train.py --phrase "vibrant colors++|boring--" \
+    --out outputs/my_run \
+    --verify-prompt "a cat sitting on a windowsill"
 ```
 
-This assumes you've got a working anaconda environment set up.
+Every velocity-space loss operates on the classifier-free-guidance geometry
+`v(z,t,c) − v(z,t,'')` — the same translation used by modern concept-erasure
+work on rectified-flow transformers (EraseAnything ICML'25, GEM '26), which is
+what the original did with UNet noise predictions.
 
-## Dependency issues
+## The DSL
 
-Please see this dockerfile for the list of dependencies you need:
+Rules are separated by `|`. Each rule is scaled by an optional `:alpha`.
 
-https://github.com/ntc-ai/conceptmod/blob/main/docker/Dockerfile_train
+| Syntax | Name | Effect |
+|---|---|---|
+| `c++` | exaggerate | more of concept `c` in **every** generation. Optional `:guidance=g` (default 3): how far past the model's own concept direction to push |
+| `c--` | erase | remove concept `c` (true ESD erasure, sampled in the concept's own context) |
+| `a=b` | write | prompt `a` now behaves like concept `b`. `=b` (or `b=`) writes `b` into the *unconditional* prompt: the model's default output becomes `b`. Note: under CFG > 1 a baked-in unconditional acts like a negative prompt; sample at low guidance (or with turbo/CFG-free models) to see it as default content |
+| `a#b` | freeze | pin prompt `a` to the frozen model's behavior for `b`. Bare `#` pins the unconditional. Add `#`-rules to protect things you don't want to move |
+| `a%b` | orthogonal | decorrelate `b`'s concept direction from `a`'s. Negative alpha (`a%b:-1.0`) *aligns* them instead — blending |
+| `a~b` | replace | macro: `b++:0.2 \| a=b:0.4 \| b%a:-0.1` |
+| `a^b` | pixel | pixelwise L2 between full renders of `a` and `b` (gradients flow through the final sampling steps + VAE decode). Dead code in the 2023 original; implementable now that few-step flow sampling is cheap |
+| `{random_prompt}` | | substituted each step with a random prompt from `Gustavosta/Stable-Diffusion-Prompts` |
+| `:0.5` / `:key=v` | options | alpha scale / named op options |
+| `@` | | deprecated, ignored |
 
-Look for the `pip install` and `python3 setup.py develop` sections. Extracting a Lora from a checkpoint has different dependencies.
+Example from the original repo, unchanged:
 
-## Training Guide
+```
+#:0.4|human=robot:0.8|robot%human:-0.1
+```
 
-Checkout `train_sequential.sh` for an example.
+## Two-stage training
 
-## Generating Images
+Lesson learned from
+[sliders-conceptmod](https://github.com/ntc-ai/sliders-conceptmod): **train
+the text encoder first; once verified, train the model.**
 
-To generate images from one of the custom models use the following instructions:
+```bash
+python train.py --phrase "..." ...                # encoder → verify → model → verify (default)
+python train.py --phrase "..." --stage encoder    # notrigger-style, embedding space only
+python train.py --phrase "..." --stage model      # DiT finetune only (skip the encoder)
+```
 
-* To use `eval-scripts/generate-images.py` you would need a csv file with columns `prompt`, `evaluation_seed` and `case_number`. (Sample data in `data/`)
-* To generate multiple images per prompt use the argument `num_samples`. It is default to 10.
-* The path to model can be customised in the script.
-* It is to be noted that the current version requires the model to be in saved in `stable-diffusion/compvis-<based on hyperparameters>/diffusers-<based on hyperparameters>.pt`
-* `python eval-scripts/generate-images.py --model_name='compvis-word_VanGogh-method_xattn-sg_3-ng_1-iter_1000-lr_1e-05' --prompts_path 'stable-diffusion/art_prompts.csv' --save_path 'evaluation_folder' --num_samples 10` 
+* **Stage 1 (encoder)**: a LoRA on the text encoder trained purely in
+  embedding space — no diffusion sampling in the loop, so it runs in seconds
+  and is verified with images before any model training. This is the
+  modernized "notrigger" method (pooled concept directions for LLM encoders,
+  fixed-distance curriculum).
+* **Stage 2 (model)**: the DiT is finetuned with the velocity-space losses.
+  Default trains cross-attention weights directly (`--train-method
+  xattn|selfattn|attn|full|noxattn`); `--lora RANK` trains a peft LoRA
+  instead (required for Z-Image).
 
-## Notes
+## Proofs
 
-`mod_count` is set to two conceptmods being trained in parallel. You can reduce it if needed.
-`negative_guidance`, `start_guidance` which are positive in the original repository, is negative in this one. See `train_sequential.sh` for usage example.
+Each operator is demonstrated with fixed-seed before/after grids in
+`outputs/NN_<op>/grid.png` — the same seed and prompt, generated by the frozen
+model (top) and the trained model (bottom). All on SANA 0.6B, ~5-25 min each
+on one RTX A6000:
 
-## Citing our work
+All 13 SANA proofs below were audited by independent multi-agent judge
+rounds and iterated (up to 4 training rounds per op, earlier rounds kept as
+`grid_v*.png`) until every op reached a **pass** verdict:
 
-Cite the original, maybe gpt-4
+| Grid | Final phrase / settings | Result |
+|---|---|---|
+| `01_exaggerate` | `vibrant colors++` (guidance 5) | globally vivid colors, structure preserved |
+| `02_erase` | `monochrome--` (800 iters) | monochrome / black-and-white / grayscale prompts all render in color |
+| `03_write_uncond` | `=snow` | empty-prompt generations become snowy scenes |
+| `04_write` | `cat=dog` (900 iters) | cat prompts produce dogs, including contextual scenes |
+| `05_freeze` | `monochrome--\|a chessboard#a chessboard` | frozen chessboard stays B&W while B&W portraits colorize around it |
+| `06_blend` | `anime%hyperrealistic:-3\|hyperrealistic%anime:-3` | symmetric phrase = true two-way style convergence |
+| `07_orthogonal` | `cat%dog:2\|cat#cat\|dog#dog:0.5` | dogs de-catted with clean anatomy; `#` anchors both concepts' integrity |
+| `08_replace` | `cat~dog:0.35` (900 iters) | macro expansion flips cat prompts to dogs in all contexts |
+| `09_encoder_stage` | `--stage encoder --encoder-strength 2` | clearly visible global shift from the text-encoder LoRA alone |
+| `10_random_prompt` | `final boss++:0.4\|final boss%{random_prompt}:-0.1` | dramatically more imposing bosses, controls pinned |
+| `11_pixel` | `a painting of a house^a photo of a house` (220 iters, lr 1e-5) | paintings shift to photographic palette, no wash-out, photo side anchored |
+| `12_composite` | `#:0.4\|human=robot:0.8\|robot%human:-0.1` | humans become robots, uncond frozen, fruit stable |
+| `13_stage_both` | `--stage both` | full encoder→verify→model pipeline, strongest effect |
+| `21_zimage_exaggerate` | `vibrant colors++` (Z-Image Turbo, LoRA 16) | 2026 6B model: glowing ambers, saturated skies |
+| `22_zimage_write` | `cat=dog` (Z-Image Turbo, LoRA 16) | complete replacement: cats render as dogs in identical compositions (mild drift on unrelated prompts — add a `#` rule to pin what matters) |
+
+## Tuning notes (learned from the proofs)
+
+* **Probe globalization is what makes ops feel global.** `++` trains 70% of
+  steps on random probe prompts (`v(p) -> v(p) + g(v("p, c") - v(p))`) and
+  `=` wraps both concepts in shared random templates. Without this, effects
+  stay local to the literal concept prompt (the original repo's weakness).
+* Model-stage defaults that worked: `--lr 2e-5`, 500-700 iterations,
+  `--train-method xattn` (148M params on SANA), exaggerate guidance 3-5,
+  write guidance 2.
+* `#` freeze has a wide protection radius: freezing a prompt that shares
+  tokens with an erase concept will suppress the erase nearby — pick freeze
+  targets token-disjoint from what you're erasing (chessboard, not another
+  "black and white ..." phrase).
+* **Compose `#` anchors instead of lowering strength.** When an op damages a
+  concept it touches (e.g. `cat%dog:3` corrupted dog anatomy), a half-weight
+  anchor (`|dog#dog:0.5`) restores integrity while keeping the edit; lowering
+  alpha alone did not.
+* Erase strength is a real dial: at 600 iters the erase missed scene-heavy
+  prompts, at 1000 it overcooked outputs into flat illustration styles;
+  ~800 at lr 2e-5 was the sweet spot for `monochrome--`.
+* `%` is one-directional (only `b` trains); for a mutual blend write the
+  symmetric phrase. |alpha| ~3 for standalone effects; small values (-0.1)
+  are composite regularizers, per the original.
+* The `^` pixel op needs a light hand: lr 1e-5 and ~220 iterations with the
+  built-in b-side anchor; more pressure re-introduces L2 wash-out.
+* Z-Image Turbo: LoRA rank 16, `--lr 1e-4 --sample-steps 8 --sample-guidance 0`
+  (it is CFG-distilled), 768px training resolution + gradient checkpointing
+  fits in ~21GB; ~5s/step. Its transformer predicts the *negated* flow
+  velocity and uses custom sigmas — handled inside the backend.
+
+## Credits
+
+Based on [Erasing Concepts from Diffusion Models](https://erasing.baulab.info)
+(Gandikota et al.) and
+[Concept Sliders](https://sliders.baulab.info) (Gandikota et al.), via
+[ntc-ai/conceptmod](https://github.com/ntc-ai/conceptmod) and
+[ntc-ai/sliders-conceptmod](https://github.com/ntc-ai/sliders-conceptmod).
+See [ntcai.xyz](https://ntcai.xyz) for models trained with the original.
