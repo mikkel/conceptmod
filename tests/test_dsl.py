@@ -240,10 +240,14 @@ class TestDescribePhrase:
         note = describe_phrase("cat=dog")
         assert "cat" in note and "dog" in note
         assert "Write" in note
+        assert "remap" in note.lower()
+        assert "~" in note
 
     def test_replace_not_expanded(self):
         note = describe_phrase("cat~dog:0.35")
         assert "Replace" in note
+        assert "swap recipe" in note
+        assert "cat=dog" in note
         assert "Exaggerate" not in note
         assert "Orthogonal" not in note
 

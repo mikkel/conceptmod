@@ -85,8 +85,9 @@ content; under CFG > 1 it behaves like a negative prompt.
 
 ### 04 write
 
-`cat=dog` (900 iters) — cat prompts produce dogs, including contextual scenes.
-Fruit stays fruit.
+`cat=dog` (900 iters) — **remap only**: cat prompts produce dogs. Dog itself
+is not boosted, so one windowsill seed still looks like a cat. Fruit stays
+fruit. For a more thorough swap, use `~` below.
 
 <p align="center">
   <img src="outputs/04_write/grid.png" alt="Write: cat prompts behave like dog" width="680" />
@@ -121,8 +122,10 @@ anchors keep both concepts' anatomy intact.
 
 ### 08 replace
 
-`cat~dog:0.35` (900 iters) — macro expansion flips cat prompts to dogs in
-every context.
+`cat~dog:0.35` (900 iters) — **swap recipe**, not a fourth loss. Expands to
+`dog++:0.7 | cat=dog:1.4 | dog%cat:-0.35`: turn dog up, remap cat→dog, lightly
+align. Same job as `04` but it takes in every context, including the
+windowsill seed write missed.
 
 <p align="center">
   <img src="outputs/08_replace/grid.png" alt="Replace cat with dog" width="680" />
@@ -201,16 +204,25 @@ Rules are separated by `|`. Each rule is scaled by an optional `:alpha`.
 |---|---|---|
 | `c++` | exaggerate | more of concept `c` in **every** generation. Optional `:guidance=g` (default 3): how far past the model's own concept direction to push |
 | `c--` | erase | remove concept `c` (true ESD erasure, sampled in the concept's own context) |
-| `a=b` | write | prompt `a` now behaves like concept `b`. `=b` (or `b=`) writes `b` into the *unconditional* prompt: the model's default output becomes `b`. Note: under CFG > 1 a baked-in unconditional acts like a negative prompt; sample at low guidance (or with turbo/CFG-free models) to see it as default content |
+| `a=b` | write | **one loss**: remap prompt `a` so it behaves like concept `b`. Does not boost `b` globally. `=b` (or `b=`) writes `b` into the empty / unconditional prompt. Under CFG > 1 a baked-in unconditional acts like a negative prompt; sample at low guidance (or turbo / CFG-free) to see it as default content |
 | `a#b` | freeze | pin prompt `a` to the frozen model's behavior for `b`. Bare `#` pins the unconditional. Add `#`-rules to protect things you don't want to move |
 | `a%b` | orthogonal | decorrelate `b`'s concept direction from `a`'s. Negative alpha (`a%b:-1.0`) *aligns* them instead — blending |
-| `a~b` | replace | macro: `b++:0.2 \| a=b:0.4 \| b%a:-0.1` |
+| `a~b` | replace | **not a fourth loss** — a swap recipe that expands to `b++:0.2 \| a=b:0.4 \| b%a:-0.1` (the `:λ` on `~` scales those three). Use when a plain write does not take in every context |
 | `a^b` | pixel | pixelwise L2 between full renders of `a` and `b` (gradients flow through the final sampling steps + VAE decode). Dead code in the 2023 original; implementable now that few-step flow sampling is cheap |
 | `{random_prompt}` | | substituted each step with a random prompt from `Gustavosta/Stable-Diffusion-Prompts` |
 | `:0.5` / `:key=v` | options | alpha scale / named op options |
 | `@` | | deprecated, ignored |
 
-Example from the original repo, unchanged:
+**`=` vs `~`.** `cat=dog` is a single remap: cat-prompts are trained to match
+dog's velocity. Dog prompts, and everything else, are left alone. `cat~dog`
+is shorthand for *also* turning dog up (`++`) and lightly aligning the two
+(`%` with negative alpha) so the swap generalizes. Same idea as writing
+`#:0.4|human=robot:0.8|robot%human:-0.1` by hand — `~` just packages the
+common swap. In the proofs, write still missed one windowsill seed; replace
+did not.
+
+Example from the original repo, unchanged (a write plus freeze plus align,
+not a `~`):
 
 ```
 #:0.4|human=robot:0.8|robot%human:-0.1

@@ -8,12 +8,12 @@ Operators (see README for semantics):
 
     c++            exaggerate concept c            (options: alpha, guidance)
     c--            erase concept c
-    a=b            write concept b into prompt a   ("=b" or "b=" writes b into
-                                                    the unconditional/empty prompt)
+    a=b            write: remap prompt a so it behaves like concept b
+                   ("=b" / "b=" writes b into the empty/unconditional prompt)
     a#b            freeze: keep a's prediction pinned to frozen model's b
     #              freeze the unconditional prompt
     a%b            make b orthogonal to a (negative alpha pulls b toward a)
-    a~b            replace a with b (macro: expands to ++, = and % rules)
+    a~b            replace a with b (macro, not a fourth loss): b++ | a=b | b%a:-λ
     a^b            pixelwise L2 between renders of a and b
     ;c             ImageReward scoring (not implemented, kept for compat)
     @              deprecated, stripped and ignored
@@ -210,8 +210,10 @@ def _q(concept: str) -> str:
 
 def _describe_replace(source: str, target: str) -> str:
     return (
-        f"Replace {_q(source)} with {_q(target)}: "
-        f"{source or 'empty'} prompts should produce {target}s."
+        f"Replace {_q(source)} with {_q(target)} — a swap recipe, not a single "
+        f"loss. Expands to {target}++ (more {target} everywhere), "
+        f"{source}={target} (remap those prompts), and a small align so the "
+        f"swap sticks in more contexts than a plain write."
     )
 
 
@@ -231,7 +233,11 @@ def _describe_rule(rule: Rule) -> str:
                 f"Write {_q(rule.b)} into the empty prompt so the model's "
                 f"default output becomes {rule.b}."
             )
-        return f"Write: {_q(rule.a)} prompts should behave like {_q(rule.b)}."
+        return (
+            f"Write: {_q(rule.a)} prompts should behave like {_q(rule.b)}. "
+            f"A remap only — does not boost {_q(rule.b)} globally "
+            f"(use ~ if you want the full swap)."
+        )
     if rule.op == FREEZE:
         if not rule.a and not rule.b:
             return (
