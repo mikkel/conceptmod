@@ -1,0 +1,26 @@
+[project]
+name = "conceptmod"
+version = "2.0.0"
+description = "Finetuning with words: a DSL for concept editing of flow-matching diffusion models"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.8",
+    "torchvision",
+    "diffusers @ git+https://github.com/huggingface/diffusers.git",
+    "transformers>=4.57",
+    "peft>=0.17",
+    "accelerate",
+    "safetensors",
+    "datasets",
+    "sentencepiece",
+    "pillow",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["conceptmod*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

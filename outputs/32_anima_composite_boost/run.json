@@ -1,0 +1,39 @@
+{
+  "phrase": "#:0.4|human=robot:0.8|robot++:0.4|robot%human:-0.1",
+  "backend": "anima",
+  "model_id": null,
+  "resolution": null,
+  "device": "cuda:0",
+  "out": "outputs/32_anima_composite_boost",
+  "stage": "model",
+  "encoder_iterations": 400,
+  "encoder_lr": 0.0001,
+  "encoder_rank": 8,
+  "encoder_strength": 1.0,
+  "iterations": 500,
+  "lr": 5e-05,
+  "train_method": "xattn",
+  "lora": 16,
+  "accumulation_steps": 1,
+  "seed": 0,
+  "sample_prompt": null,
+  "verify_prompt": [
+    "masterpiece, best quality, safe, score_7, a human walking in a city, anime",
+    "masterpiece, best quality, safe, score_7, a portrait of a human, anime",
+    "masterpiece, best quality, safe, score_7, a bowl of fruit on a table, anime still life"
+  ],
+  "verify_seeds": [
+    42,
+    1234
+  ],
+  "exaggerate_guidance": null,
+  "erase_guidance": null,
+  "write_guidance": null,
+  "sample_steps": null,
+  "sample_guidance": null,
+  "eval_every": 0,
+  "swap_stop": 0.35,
+  "hold_max": 0.25,
+  "min_steps": 75,
+  "save_model": false
+}
