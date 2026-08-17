@@ -7,14 +7,16 @@ models, using only the model's own learned representations — no datasets, no
 example images. This is a modernization of
 [ntc-ai/conceptmod](https://github.com/ntc-ai/conceptmod) (2023, CompVis-era
 Stable Diffusion) targeting current flow-matching DiT models via
-🤗 diffusers + transformers + peft:
+🤗 diffusers + transformers + peft.
 
-* **SANA 0.6B** (`Efficient-Large-Model/Sana_600M_512px_diffusers`) — default;
-  small and fast enough to prove every operator in minutes
-* **Z-Image Turbo 6B** (`Tongyi-MAI/Z-Image-Turbo`) — 2026-class model, LoRA training
-* **Anima 2B** (`circlestone-labs/Anima-Base-v1.0-Diffusers`) — anime Cosmos-Predict2 DiT, LoRA training
-* **Krea 2 Raw 12B** (`krea/Krea-2-Raw`) — 2026 single-stream MMDiT, LoRA training
-  (train on Raw; Turbo is the 8-step distilled sibling)
+| `--backend` | Model | Checkpoint | Size | Train | Sample |
+|---|---|---|---|---|---|
+| `sana` (default) | SANA | `Efficient-Large-Model/Sana_600M_512px_diffusers` | 0.6B | xattn or LoRA · 512px | 20 steps · CFG 4.5 |
+| `zimage` | Z-Image Turbo | `Tongyi-MAI/Z-Image-Turbo` | 6B | LoRA 16 · 768px | 8 steps · CFG 0 |
+| `anima` | Anima Base | `circlestone-labs/Anima-Base-v1.0-Diffusers` | 2B | LoRA 16 · 768px | 40 steps · CFG 4 |
+| `krea` | Krea 2 Raw | `krea/Krea-2-Raw` | 12B | LoRA 16 · 512px | 28 steps · CFG 4.5 |
+
+SDXL is conceptmod 1.x (UNet + CLIP), not this stack. Krea Turbo (`krea/Krea-2-Turbo`) is the 8-step distilled sibling — train LoRAs on Raw.
 
 The phrase to start with is the original-repo example — freeze the empty
 prompt, write robot into human, lightly align so the swap holds:
