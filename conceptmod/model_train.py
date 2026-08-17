@@ -70,13 +70,13 @@ def train_model(
         ctx = ops.StepContext(backend, stop_index, step_seed, cfg, probe=probe)
 
         losses = {}
-        total = None
         for rule in step_rules:
             loss = rule.alpha * ops.rule_loss(rule, ctx)
             losses[rule.raw] = loss.item()
-            total = loss if total is None else total + loss
-
-        (total / accumulation_steps).backward()
+            # One rule at a time so a 12B composite does not keep four
+            # graphs alive. Sum of backwards == backward of the sum.
+            (loss / accumulation_steps).backward()
+            ctx._v = {k: t for k, t in ctx._v.items() if not k[3]}
         if (i + 1) % accumulation_steps == 0:
             torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
             opt.step()

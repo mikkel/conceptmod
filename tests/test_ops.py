@@ -125,10 +125,30 @@ def test_require_cuda_rejects_cpu():
 
 
 def test_unknown_backend_rejected():
-    from conceptmod.backends import load_backend
+    from conceptmod.backends import BACKENDS, load_backend
 
+    assert BACKENDS == ("sana", "zimage", "anima", "krea")
     with pytest.raises(ValueError, match="unknown backend"):
         load_backend("nope", device="cpu")
+    with pytest.raises(ValueError, match="1.x"):
+        load_backend("sdxl", device="cpu")
+
+
+def test_backends_share_the_same_protocol():
+    """Adding a model must not fork the trainer contract."""
+    from conceptmod.backends.anima import AnimaBackend
+    from conceptmod.backends.krea import KreaBackend
+    from conceptmod.backends.sana import SanaBackend
+    from conceptmod.backends.zimage import ZImageBackend
+
+    required = (
+        "encode_text", "encode_text_grad", "predict_v", "partial_denoise",
+        "render", "generate", "trainable_parameters", "save_trained",
+        "training_defaults", "attach_encoder_lora",
+    )
+    for cls in (SanaBackend, ZImageBackend, AnimaBackend, KreaBackend):
+        for name in required:
+            assert callable(getattr(cls, name)), f"{cls.__name__}.{name}"
 
 
 def test_encoder_pool_flattens_layered_embeds():

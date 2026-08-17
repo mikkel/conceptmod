@@ -120,6 +120,8 @@ def main():
         if sample_prompt is None:
             sample_prompt = next(
                 (p for p in args.verify_prompt if not is_control_prompt(p)), None)
+        if sample_prompt == "":
+            sample_prompt = None
         if sample_prompt:
             print(f"progress shots: {sample_prompt!r} -> {args.out}/progress")
         train_model(

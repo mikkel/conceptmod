@@ -20,7 +20,7 @@ from diffusers.pipelines.krea2.pipeline_krea2 import calculate_shift
 
 from conceptmod.backends.base import Backend, TextEmbeds, pin_modules, require_cuda
 
-DEFAULT_MODEL = "krea/Krea-2-Turbo"
+DEFAULT_MODEL = "krea/Krea-2-Raw"
 _LORA_TARGETS = ["to_q", "to_k", "to_v", "to_out.0"]
 
 
@@ -31,7 +31,7 @@ class KreaBackend(Backend):
                  generate_guidance: float | None = None):
         self.device = str(require_cuda(device))
         self.resolution = resolution
-        self.pipe = Krea2Pipeline.from_pretrained(model_id, torch_dtype=torch.bfloat16)
+        self.pipe = Krea2Pipeline.from_pretrained(model_id, dtype=torch.bfloat16)
         moved = pin_modules(self.pipe, self.device)
         print(f"krea modules on {self.device}: {', '.join(moved)}")
         self.pipe.set_progress_bar_config(disable=True)
@@ -66,6 +66,9 @@ class KreaBackend(Backend):
         if hasattr(base, "enable_gradient_checkpointing"):
             base.enable_gradient_checkpointing()
         self.frozen = None
+        # VAE is only needed for generate / pixel; park it on CPU while training.
+        self.pipe.vae.to("cpu")
+        torch.cuda.empty_cache()
 
         self.patch_size = self.pipe.patch_size
         self.vae_scale_factor = self.pipe.vae_scale_factor
@@ -216,6 +219,7 @@ class KreaBackend(Backend):
         return self.decode(z, grad=not frozen and grad_steps > 0)
 
     def decode(self, z, grad=False):
+        self.pipe.vae.to(self.device)
         vae = self.pipe.vae
         with torch.set_grad_enabled(grad):
             latents = self.pipe._unpack_latents(
@@ -230,16 +234,27 @@ class KreaBackend(Backend):
 
     @torch.no_grad()
     def generate(self, prompt, seed, num_steps=None, guidance=None, frozen=False):
-        from PIL import Image
+        from contextlib import nullcontext
 
         num_steps = num_steps or self.generate_steps
         guidance = self.generate_guidance if guidance is None else guidance
         g = torch.Generator(device=self.device).manual_seed(seed)
-        img = self.render(prompt, g, num_steps, guidance, grad_steps=0,
-                          frozen=frozen)
-        img = ((img.clamp(-1, 1) + 1) / 2 * 255).round().byte()
-        arr = img.squeeze(0).permute(1, 2, 0).cpu().numpy()
-        return Image.fromarray(arr)
+        self.pipe.vae.to(self.device)
+        ctx = self.transformer.disable_adapter() if frozen else nullcontext()
+        try:
+            with ctx:
+                out = self.pipe(
+                    prompt,
+                    height=self.resolution,
+                    width=self.resolution,
+                    num_inference_steps=num_steps,
+                    guidance_scale=guidance,
+                    generator=g,
+                )
+        finally:
+            self.pipe.vae.to("cpu")
+            torch.cuda.empty_cache()
+        return out.images[0]
 
     # ---------------- training ----------------
 

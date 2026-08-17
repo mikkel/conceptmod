@@ -13,7 +13,8 @@ Stable Diffusion) targeting current flow-matching DiT models via
   small and fast enough to prove every operator in minutes
 * **Z-Image Turbo 6B** (`Tongyi-MAI/Z-Image-Turbo`) — 2026-class model, LoRA training
 * **Anima 2B** (`circlestone-labs/Anima-Base-v1.0-Diffusers`) — anime Cosmos-Predict2 DiT, LoRA training
-* **Krea 2 Turbo 12B** (`krea/Krea-2-Turbo`) — 2026 single-stream MMDiT, LoRA training
+* **Krea 2 Raw 12B** (`krea/Krea-2-Raw`) — 2026 single-stream MMDiT, LoRA training
+  (train on Raw; Turbo is the 8-step distilled sibling)
 
 The phrase to start with is the original-repo example — freeze the empty
 prompt, write robot into human, lightly align so the swap holds:
@@ -322,9 +323,10 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
   image. `human` is a weak tag in full-body scenes; add `robot++` (or use
   `~`) and a walking-city write template if the walk prompt must take.
   Do not train the LLM adapter (`text_conditioner`).
-* Krea 2 Turbo: LoRA-only, 768px, 8-step distilled schedule, CFG off
-  (`guidance=0`). Train and verify on the same checkpoint; official advice
-  is to train LoRAs on Raw and run them on Turbo.
+* Krea 2 Raw: LoRA-only, 512px training fits a 48GB card (768 generate
+  needs ~42GB). Park the VAE on CPU while training. Composite phrases
+  backward one rule at a time so four graphs do not sit on the 12B DiT.
+  Official advice is still train LoRAs on Raw and run them on Turbo.
 
 ## Credits
 

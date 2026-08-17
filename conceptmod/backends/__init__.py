@@ -1,5 +1,6 @@
 from conceptmod.backends.base import Backend
 
+# One process, one backend. Switching --backend must not change the others.
 BACKENDS = ("sana", "zimage", "anima", "krea")
 
 
@@ -21,4 +22,10 @@ def load_backend(name: str, device: str, **kwargs) -> Backend:
         from conceptmod.backends.krea import KreaBackend
 
         return KreaBackend(device=device, **kwargs)
+    if name == "sdxl":
+        raise ValueError(
+            "SDXL is conceptmod 1.x (UNet + CLIP). "
+            "2.0 backends are flow-matching DiTs: "
+            + ", ".join(BACKENDS)
+        )
     raise ValueError(f"unknown backend {name!r}; expected one of {BACKENDS}")

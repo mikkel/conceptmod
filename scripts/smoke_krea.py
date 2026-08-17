@@ -1,4 +1,4 @@
-"""Smoke test Krea 2 Turbo backend: baseline generation + one op step."""
+"""Smoke test Krea 2 Raw backend: baseline generation + one op step."""
 import os
 import time
 
@@ -13,7 +13,8 @@ t0 = time.time()
 backend = load_backend("krea", device=DEVICE, lora_rank=16)
 print(f"loaded in {time.time() - t0:.0f}s; latent shape {backend.latent_shape}")
 print("scheduler:", type(backend.pipe.scheduler).__name__,
-      "distilled:", backend.is_distilled)
+      "distilled:", backend.is_distilled,
+      "steps", backend.generate_steps, "cfg", backend.generate_guidance)
 
 os.makedirs("outputs/40_krea_baseline", exist_ok=True)
 prompts = [
@@ -31,7 +32,7 @@ for i, p in enumerate(prompts):
 params = backend.trainable_parameters("lora")
 print("lora params:", sum(p.numel() for p in params) / 1e6, "M")
 
-cfg = ops.OpDefaults(sample_steps=8, sample_guidance=0.0)
+cfg = ops.OpDefaults(**backend.training_defaults())
 rules = dsl.parse_phrase("vibrant colors++")
 ctx = ops.StepContext(backend, stop_index=4, seed=7, cfg=cfg)
 t1 = time.time()
