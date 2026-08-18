@@ -123,6 +123,7 @@ def train_model(
             os.makedirs(sample_dir, exist_ok=True)
             img = backend.generate(sample_prompt, seed=42)
             img.save(f"{sample_dir}/{i + 1:05d}.png")
+            torch.cuda.empty_cache()
 
     backend.transformer.eval()
     return history

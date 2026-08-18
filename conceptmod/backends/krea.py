@@ -3,10 +3,16 @@
 LoRA-only: a second copy of the 12B transformer will not fit. The frozen
 reference is the base model with the adapter disabled.
 
-Krea 2 Turbo (this default) is TDM-distilled: 8 steps, CFG off
-(``guidance=0``), cond-anchored CFG when guidance is enabled
-(``v = cond + g * (cond - uncond)``). Raw (``krea/Krea-2-Raw``) is the
-undistilled midtrain checkpoint: ~28 steps, guidance 4.5.
+Krea 2 Turbo is TDM-distilled: 8 steps, CFG off (``guidance=0``),
+cond-anchored CFG when guidance is enabled
+(``v = cond + g * (cond - uncond)``). Raw (``krea/Krea-2-Raw``, the
+default hub id) is the undistilled midtrain checkpoint: ~28 steps,
+guidance 4.5.
+
+``model_id`` can also be a local ComfyUI ``.safetensors`` (bf16 or
+Kitchen NVFP4). VAE + Qwen3-VL still come from the Raw hub skeleton;
+the file replaces only the transformer. Names containing ``turbo``
+force the distilled 8-step schedule.
 
 Working latents are *packed* the way the official pipeline keeps them
 (seq, C·p·p) so the scheduler and transformer share one layout.
@@ -14,14 +20,40 @@ Working latents are *packed* the way the official pipeline keeps them
 
 from __future__ import annotations
 
+from collections import OrderedDict
+
 import torch
 from diffusers import Krea2Pipeline
 from diffusers.pipelines.krea2.pipeline_krea2 import calculate_shift
 
-from conceptmod.backends.base import Backend, TextEmbeds, pin_modules, require_cuda
+from conceptmod.backends.base import Backend, TextEmbeds, require_cuda
+from conceptmod.backends.krea_weights import (
+    SKELETON_MODEL,
+    load_comfy_krea_transformer,
+    looks_turbo,
+    resolve_local_transformer,
+)
 
 DEFAULT_MODEL = "krea/Krea-2-Raw"
 _LORA_TARGETS = ["to_q", "to_k", "to_v", "to_out.0"]
+# Krea stacks 12 x 2560-d layer taps at seq 512: ~30 MiB bf16 per prompt.
+# ++ caches a new random probe almost every step; leaving those on GPU is
+# a ~60 MiB/step leak and OOM around step 100-200.
+_TEXT_CACHE_MAX = 16
+
+
+def _load_pipeline(model_id: str) -> Krea2Pipeline:
+    local = resolve_local_transformer(model_id)
+    if local is None:
+        return Krea2Pipeline.from_pretrained(model_id, dtype=torch.bfloat16)
+    print(f"krea local transformer: {local}")
+    transformer = load_comfy_krea_transformer(local, skeleton=SKELETON_MODEL)
+    pipe = Krea2Pipeline.from_pretrained(
+        SKELETON_MODEL, transformer=transformer, dtype=torch.bfloat16)
+    if looks_turbo(local) and not pipe.config.is_distilled:
+        pipe.register_to_config(is_distilled=True)
+        print("krea: local file looks like turbo; is_distilled=True")
+    return pipe
 
 
 class KreaBackend(Backend):
@@ -31,9 +63,14 @@ class KreaBackend(Backend):
                  generate_guidance: float | None = None):
         self.device = str(require_cuda(device))
         self.resolution = resolution
-        self.pipe = Krea2Pipeline.from_pretrained(model_id, dtype=torch.bfloat16)
-        moved = pin_modules(self.pipe, self.device)
-        print(f"krea modules on {self.device}: {', '.join(moved)}")
+        self.pipe = _load_pipeline(model_id)
+        # 12B DiT + 4B Qwen3-VL + VAE do not all fit next to training
+        # activations. Only the transformer lives on GPU; encode/generate
+        # pull the others over for the call.
+        self.pipe.vae.to("cpu")
+        self.pipe.text_encoder.to(self.device)
+        self.pipe.transformer.to(self.device)
+        print(f"krea transformer+text_encoder on {self.device}; vae parked on cpu")
         self.pipe.set_progress_bar_config(disable=True)
 
         self.is_distilled = bool(getattr(self.pipe.config, "is_distilled", False))
@@ -66,7 +103,7 @@ class KreaBackend(Backend):
         if hasattr(base, "enable_gradient_checkpointing"):
             base.enable_gradient_checkpointing()
         self.frozen = None
-        # VAE is only needed for generate / pixel; park it on CPU while training.
+        # VAE is only needed for generate / pixel.
         self.pipe.vae.to("cpu")
         torch.cuda.empty_cache()
 
@@ -80,7 +117,7 @@ class KreaBackend(Backend):
         self.grid_hw = (packed, packed)
         self.latent_channels = base.config.in_channels // (self.patch_size ** 2)
         self.latent_shape = (packed * packed, base.config.in_channels)
-        self._text_cache: dict[tuple[str, bool], TextEmbeds] = {}
+        self._text_cache: OrderedDict[tuple[str, bool], TextEmbeds] = OrderedDict()
         self.encoder_lora = False
         self.max_sequence_length = 512
 
@@ -91,11 +128,29 @@ class KreaBackend(Backend):
 
     # ---------------- text ----------------
 
+    def _park_text_encoder(self):
+        """Drop the 4B Qwen3-VL off GPU before the 12B DiT backward."""
+        if self.encoder_lora:
+            return
+        if next(self.pipe.text_encoder.parameters()).device.type == "cuda":
+            self.pipe.text_encoder.to("cpu")
+            torch.cuda.empty_cache()
+
     def _encode_raw(self, prompt: str) -> TextEmbeds:
+        self.pipe.text_encoder.to(self.device)
         embeds, mask = self.pipe.get_text_hidden_states(
             prompt, self.max_sequence_length, self.device,
         )
         return TextEmbeds(embeds, mask)
+
+    def _remember_text(self, key: tuple[str, bool], text: TextEmbeds) -> None:
+        self._text_cache[key] = TextEmbeds(
+            text.embeds.detach().to("cpu"),
+            None if text.mask is None else text.mask.detach().to("cpu"),
+        )
+        self._text_cache.move_to_end(key)
+        while len(self._text_cache) > _TEXT_CACHE_MAX:
+            self._text_cache.popitem(last=False)
 
     @torch.no_grad()
     def encode_text(self, prompt: str, frozen: bool = False) -> TextEmbeds:
@@ -105,10 +160,17 @@ class KreaBackend(Backend):
         if key not in self._text_cache:
             if self.encoder_lora and frozen:
                 with self.pipe.text_encoder.disable_adapter():
-                    self._text_cache[key] = self._encode_raw(prompt)
+                    raw = self._encode_raw(prompt)
             else:
-                self._text_cache[key] = self._encode_raw(prompt)
-        return self._text_cache[key]
+                raw = self._encode_raw(prompt)
+            self._remember_text(key, raw)
+        else:
+            self._text_cache.move_to_end(key)
+        text = self._text_cache[key]
+        return TextEmbeds(
+            text.embeds.to(self.device),
+            None if text.mask is None else text.mask.to(self.device),
+        )
 
     def encode_text_grad(self, prompt: str) -> TextEmbeds:
         return self._encode_raw(prompt)
@@ -234,27 +296,23 @@ class KreaBackend(Backend):
 
     @torch.no_grad()
     def generate(self, prompt, seed, num_steps=None, guidance=None, frozen=False):
-        from contextlib import nullcontext
+        from PIL import Image
 
         num_steps = num_steps or self.generate_steps
         guidance = self.generate_guidance if guidance is None else guidance
         g = torch.Generator(device=self.device).manual_seed(seed)
-        self.pipe.vae.to(self.device)
-        ctx = self.transformer.disable_adapter() if frozen else nullcontext()
+        # Encode on GPU, then park the 4B encoder so denoise + VAE decode
+        # do not sit next to it. Official pipe() keeps all three resident.
         try:
-            with ctx:
-                out = self.pipe(
-                    prompt,
-                    height=self.resolution,
-                    width=self.resolution,
-                    num_inference_steps=num_steps,
-                    guidance_scale=guidance,
-                    generator=g,
-                )
+            img = self.render(prompt, g, num_steps, guidance, grad_steps=0,
+                              frozen=frozen)
         finally:
             self.pipe.vae.to("cpu")
+            self._park_text_encoder()
             torch.cuda.empty_cache()
-        return out.images[0]
+        img = ((img.clamp(-1, 1) + 1) / 2 * 255).round().byte()
+        arr = img.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        return Image.fromarray(arr)
 
     # ---------------- training ----------------
 
