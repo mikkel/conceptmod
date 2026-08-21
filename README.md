@@ -14,9 +14,9 @@ Stable Diffusion) targeting current flow-matching DiT models via
 | `sana` (default) | SANA | `Efficient-Large-Model/Sana_600M_512px_diffusers` | 0.6B | xattn or LoRA · 512px | 20 steps · CFG 4.5 |
 | `zimage` | Z-Image Turbo | `Tongyi-MAI/Z-Image-Turbo` | 6B | LoRA 16 · 768px | 8 steps · CFG 0 |
 | `anima` | Anima Base | `circlestone-labs/Anima-Base-v1.0-Diffusers` | 2B | LoRA 16 · 768px | 40 steps · CFG 4 |
-| `krea` | Krea 2 Raw | `krea/Krea-2-Raw` | 12B | LoRA 16 · 512px | 28 steps · CFG 4.5 |
+| `krea` | Krea 2 Raw / local Turbo | `krea/Krea-2-Raw` or a ComfyUI `.safetensors` | 12B | LoRA 16 · 512px | Raw 28 / CFG 4.5 · Turbo 8 / CFG 0 |
 
-SDXL is conceptmod 1.x (UNet + CLIP), not this stack. Krea Turbo (`krea/Krea-2-Turbo`) is the 8-step distilled sibling — train LoRAs on Raw.
+SDXL is conceptmod 1.x (UNet + CLIP), not this stack. Krea Turbo is the 8-step distilled sibling. Official advice is still train LoRAs on Raw and run them on Turbo; a local ComfyUI / Kitchen NVFP4 file (``--model-id models/kreaturboft_nvfp4.safetensors``) dequants to bf16 so the same LoRA trainer can run on Turbo itself.
 
 The phrase to start with is the original-repo example — freeze the empty
 prompt, write robot into human, lightly align so the swap holds:
@@ -66,7 +66,8 @@ iterated (earlier rounds kept as `grid_v*.png`) until every op reached a
 [Z-Image ++](#21-zimage-exaggerate) ·
 [Z-Image write](#22-zimage-write) ·
 [Anima composite](#31-anima-composite) ·
-[Anima composite + ++](#32-anima-composite-boost)
+[Anima composite + ++](#32-anima-composite-boost) ·
+[Krea Turbo ++](#42-krea-turbo-exaggerate)
 
 ### 01 exaggerate
 
@@ -236,6 +237,24 @@ python train.py --backend anima --stage model --lora 16 \
   <img src="outputs/32_anima_composite_boost/grid.png" alt="Anima composite with robot++" width="680" />
 </p>
 
+### 42 krea turbo exaggerate
+
+`vibrant colors++` on a local Krea 2 Turbo checkpoint (Kitchen NVFP4
+dequantized to bf16, LoRA 16, 512px, 8 steps / CFG 0). Outdoor cats pick
+up greener foliage; the fruit control saturates (oranges appear).
+
+```bash
+python train.py --backend krea --stage model --lora 16 \
+    --model-id models/kreaturboft_nvfp4.safetensors \
+    --phrase "vibrant colors++" --lr 1e-4 --iterations 250 \
+    --resolution 512 --sample-prompt "" \
+    --out outputs/42_krea_turbo_exaggerate
+```
+
+<p align="center">
+  <img src="outputs/42_krea_turbo_exaggerate/grid.png" alt="Krea Turbo exaggerate vibrant colors" width="680" />
+</p>
+
 ## The DSL
 
 Rules are separated by `|`. Each rule is scaled by an optional `:alpha`.
@@ -329,6 +348,12 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
   needs ~42GB). Park the VAE on CPU while training. Composite phrases
   backward one rule at a time so four graphs do not sit on the 12B DiT.
   Official advice is still train LoRAs on Raw and run them on Turbo.
+* Local Krea Turbo (Kitchen NVFP4 or ComfyUI bf16): pass
+  `--model-id models/kreaturboft_nvfp4.safetensors`. VAE + Qwen3-VL
+  still load from `krea/Krea-2-Raw`; only the transformer is swapped.
+  NVFP4 is dequantized to bf16 before the LoRA is attached (A6000-class
+  cards do not have native FP4 tensor cores). Filename containing
+  `turbo` selects 8 steps / CFG 0.
 
 ## Credits
 
