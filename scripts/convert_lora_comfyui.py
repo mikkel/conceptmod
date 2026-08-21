@@ -11,6 +11,11 @@ Music 3 concept sliders (LoRANetwork ``lora_down``/``lora_up`` under
 ``music3_lm`` and, for the DiT, fuse ``to_q``/``to_k``/``to_v`` into
 ComfyUI's ``self_attn.to_qkv``. Anima/Krea mapping is unchanged.
 
+LM keys stay as separate ``q_proj``/``k_proj``/``v_proj``/``o_proj`` (official
+Comfy-Org bf16 CLIP). Pruned/int8 Music 3 CLIP checkpoints merge those into
+``qkv_proj``; ComfyUI then logs the q/k/v LoRA keys unused. ``o_proj`` still
+binds. See ``tests/test_comfyui_lora_apply.py``.
+
 The reference target format is ``anima_masterpiece_example.safetensors``:
 896 bf16 tensors, keys ``diffusion_model.blocks.N.<native>.lora_{A,B}.weight``,
 no alpha tensors, metadata ``{\"format\": \"pt\"}``.
@@ -173,7 +178,11 @@ def map_music3(module: str):
 
 
 def map_music3_lm(module: str):
-    """Map a LoRANetwork Music 3 LM module onto the ComfyUI CLIP stem."""
+    """Map a LoRANetwork Music 3 LM module onto the ComfyUI CLIP stem.
+
+    Separate q/k/v/o projections match official Comfy-Org bf16 CLIP. Pruned
+    checkpoints that expose ``self_attn.qkv_proj`` will not bind q/k/v.
+    """
     if module.startswith(MUSIC3_LM_PREFIX):
         module = module[len(MUSIC3_LM_PREFIX):]
     match = MUSIC3_LM_RE.match(module)
