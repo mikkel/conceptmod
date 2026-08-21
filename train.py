@@ -17,6 +17,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import time
@@ -53,7 +54,16 @@ def main():
                    choices=["xattn", "selfattn", "attn", "full", "noxattn"])
     p.add_argument("--lora", type=int, default=None, metavar="RANK",
                    help="train a LoRA of this rank instead of direct params")
-    p.add_argument("--accumulation-steps", type=int, default=1)
+    p.add_argument("--accumulation-steps", type=int, default=None,
+                   help="micro-steps averaged per optimizer step. Not a speed "
+                        "knob: one draw per update lets AdamW's scale "
+                        "invariance turn the quiet end of the schedule into a "
+                        "full-size random walk. Defaults to the backend's "
+                        "training_defaults (1 for the diffusers backends, "
+                        "8 for SenseNova).")
+    p.add_argument("--train-mlp", action="store_true",
+                   help="SenseNova only: also adapt the generation branch's "
+                        "MLP (gate/up/down), not just q/k/v/o.")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--sample-prompt", default=None,
                    help="save a progress image of this prompt periodically")
@@ -63,6 +73,11 @@ def main():
     p.add_argument("--exaggerate-guidance", type=float, default=None)
     p.add_argument("--erase-guidance", type=float, default=None)
     p.add_argument("--write-guidance", type=float, default=None)
+    p.add_argument("--write-context", default=None, choices=["target", "source"],
+                   help="trajectory the '=' op draws z_ctx from: 'source' = the "
+                        "prompt being trained (correct for pixel-space "
+                        "backends), 'target' = the concept being written. "
+                        "Defaults to the backend's training_defaults.")
     p.add_argument("--sample-steps", type=int, default=None)
     p.add_argument("--sample-guidance", type=float, default=None)
     p.add_argument("--eval-every", type=int, default=0,
@@ -78,9 +93,13 @@ def main():
         json.dump(vars(args), f, indent=2)
 
     t0 = time.time()
+    backend_kwargs = {}
+    if args.train_mlp:
+        # only the backends that understand it should ever see it
+        backend_kwargs["train_mlp"] = True
     backend = load_backend(
         args.backend, device=args.device, lora_rank=args.lora,
-        model_id=args.model_id, resolution=args.resolution,
+        model_id=args.model_id, resolution=args.resolution, **backend_kwargs,
     )
     print(f"backend loaded in {time.time() - t0:.0f}s")
 
@@ -88,10 +107,20 @@ def main():
     for name, value in getattr(backend, "training_defaults", lambda: {})().items():
         setattr(cfg, name, value)
     for name in ("exaggerate_guidance", "erase_guidance", "write_guidance",
-                 "sample_steps", "sample_guidance"):
+                 "write_context", "sample_steps", "sample_guidance",
+                 "accumulation_steps"):
         v = getattr(args, name)
         if v is not None:
             setattr(cfg, name, v)
+    # Re-record the run with the *resolved* defaults. Most of what decides
+    # whether a round works (sample_steps, write_context, accumulation_steps)
+    # comes from the backend and is None on the command line, so a run.json of
+    # raw args reads as "everything default" and forces the next reader to
+    # guess what actually ran.
+    with open(os.path.join(args.out, "run.json"), "w") as f:
+        json.dump({**vars(args), "resolved": dataclasses.asdict(cfg)},
+                  f, indent=2)
+    print("op defaults:", dataclasses.asdict(cfg))
 
     def verify(name):
         if args.verify_prompt:
@@ -130,7 +159,7 @@ def main():
             iterations=args.iterations,
             lr=args.lr,
             train_method=args.train_method,
-            accumulation_steps=args.accumulation_steps,
+            accumulation_steps=cfg.accumulation_steps,
             seed=args.seed,
             op_defaults=cfg,
             sample_prompt=sample_prompt,

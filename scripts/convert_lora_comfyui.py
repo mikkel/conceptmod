@@ -68,6 +68,17 @@ KREA_BLOCK = {
     "ff.up": "mlp.up",
     "ff.down": "mlp.down",
 }
+# SenseNova NEOChatModel needs no renaming at all: conceptmod's LoRA already
+# targets the checkpoint's own module paths (the `_mot_gen` generation branch),
+# and sensenova_u1.utils.lora.build_lora_names builds its lookup keys straight
+# off `model.named_parameters()` with a `diffusion_model.` prefix. So the map
+# is the identity over the generation branch, and a guard against anything
+# that strayed onto the understanding branch.
+SENSENOVA_RE = re.compile(
+    r"^language_model\.model\.layers\.\d+\."
+    r"(self_attn\.[qkvo]_proj_mot_gen|mlp_mot_gen\.(gate|up|down)_proj)$"
+)
+
 KREA_STEMS = (
     ("transformer_blocks.", "blocks."),
     ("text_fusion.layerwise_blocks.", "txtfusion.layerwise_blocks."),
@@ -80,10 +91,17 @@ MODEL_CLASSES = {
     "Krea2Transformer2DModel": "krea",
     "ZImageTransformer2DModel": "zimage",
     "SanaTransformer2DModel": "sana",
+    "NEOChatModel": "sensenova",
 }
+
+# kohya-style side names, and whether the consumer needs an explicit .alpha.
+# SenseNova's own merge helper looks up `.lora_down` / `.lora_up` and indexes
+# `.alpha` unconditionally, so that one gets alpha even when alpha == r.
+SIDE_NAMES = {"sensenova": {"lora_A": "lora_down", "lora_B": "lora_up"}}
+ALWAYS_ALPHA = {"sensenova"}
 # Backends whose ComfyUI key naming we could not verify against a known-good
 # file. anima is verified; krea is derived from this repo's own loader.
-UNVERIFIED = {"krea"}
+UNVERIFIED = {"krea", "sensenova"}
 UNSUPPORTED = {
     "zimage": "ComfyUI key naming for Z-Image is unknown; refusing to guess",
     "sana": "ComfyUI key naming for Sana is unverified; refusing to guess",
@@ -116,7 +134,14 @@ def map_krea(module: str):
     return None
 
 
-MAPPERS = {"anima": map_anima, "krea": map_krea}
+def map_sensenova(module: str):
+    """SenseNova LoRA keys are already the checkpoint's native paths."""
+    if SENSENOVA_RE.match(module):
+        return module
+    return None
+
+
+MAPPERS = {"anima": map_anima, "krea": map_krea, "sensenova": map_sensenova}
 
 
 def split_lora_key(key: str):
@@ -200,7 +225,9 @@ def convert(path: str, backend: str, cfg: dict):
     mapper = MAPPERS[backend]
     rank = cfg.get("r")
     alpha = cfg.get("lora_alpha")
-    emit_alpha = rank is not None and alpha is not None and alpha != rank
+    emit_alpha = rank is not None and alpha is not None and (
+        alpha != rank or backend in ALWAYS_ALPHA)
+    sides = SIDE_NAMES.get(backend, {})
 
     out, dropped, unmapped, alpha_paths = {}, [], [], set()
     with safe_open(path, framework="pt") as f:
@@ -217,7 +244,7 @@ def convert(path: str, backend: str, cfg: dict):
             if dest is None:
                 unmapped.append(key)
                 continue
-            name = f"diffusion_model.{dest}.{side}.weight"
+            name = f"diffusion_model.{dest}.{sides.get(side, side)}.weight"
             out[name] = f.get_tensor(key).to(TARGET_DTYPE).contiguous().cpu()
             alpha_paths.add(dest)
 

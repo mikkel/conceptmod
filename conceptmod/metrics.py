@@ -60,6 +60,16 @@ def _mse(a, b) -> float:
     return F.mse_loss(a, b).item()
 
 
+def _w2(backend, t) -> float:
+    """``velocity_loss_scale(t)**2``, for the scores that sum MSEs over
+    probes at different timesteps before dividing. Without it a backend whose
+    ``|v|`` grows toward t=1 (SenseNova) has its ratio decided almost entirely
+    by the highest-t probe. Ratios formed *within* one probe, and the cosine
+    and boost scores, are already scale-free and need no weight."""
+    w = float(backend.velocity_loss_scale(t))
+    return w * w
+
+
 @torch.no_grad()
 def _probes(backend, cfg: ops.OpDefaults, seeds, stop_fracs):
     steps = max(int(cfg.sample_steps), 2)
@@ -130,8 +140,9 @@ def _score_rule(backend, rule, cfg, probes, swap_stop, hold_max, remain_stop) ->
             target = v0 + g * (vb - v0)
             vt = backend.predict_v(rule.a, z, t, frozen=False)
             vf = backend.predict_v(rule.a, z, t, frozen=True)
-            nums.append(_mse(vt, target))
-            dens.append(_mse(vf, target))
+            w2 = _w2(backend, t)
+            nums.append(w2 * _mse(vt, target))
+            dens.append(w2 * _mse(vf, target))
         value = sum(nums) / max(sum(dens), 1e-8)
         return RuleScore(rule.raw, rule.op, "swap_ratio", value, value <= swap_stop)
 
@@ -153,8 +164,9 @@ def _score_rule(backend, rule, cfg, probes, swap_stop, hold_max, remain_stop) ->
             vc = backend.predict_v(rule.a, z, t, frozen=True)
             target = v0 - g * (vc - v0)
             vt = backend.predict_v(rule.a, z, t, frozen=False)
-            nums.append(_mse(vt, target))
-            dens.append(_mse(vc, target))
+            w2 = _w2(backend, t)
+            nums.append(w2 * _mse(vt, target))
+            dens.append(w2 * _mse(vc, target))
         value = sum(nums) / max(sum(dens), 1e-8)
         return RuleScore(rule.raw, rule.op, "remain", value, value <= remain_stop)
 
