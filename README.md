@@ -15,6 +15,10 @@ Stable Diffusion) targeting current flow-matching DiT models via
 * **Anima 2B** (`circlestone-labs/Anima-Base-v1.0-Diffusers`) — anime Cosmos-Predict2 DiT, LoRA training
 * **Krea 2 Raw 12B** (`krea/Krea-2-Raw`) — 2026 single-stream MMDiT, LoRA training
   (train on Raw; Turbo is the 8-step distilled sibling)
+* **SenseNova-U1.5-8B-MoT** (`sensenova/SenseNova-U1.5-8B-MoT`) — 17.5B NEO-unify
+  any-to-any LLM, LoRA training. No VAE and no diffusers pipeline: flow matching
+  runs on raw pixels and the text encoder *is* the denoiser (see Tuning notes).
+  Needs the `sensenova-u1` package (branch `feat/u1.5`), not on PyPI.
 
 The phrase to start with is the original-repo example — freeze the empty
 prompt, write robot into human, lightly align so the swap holds:
@@ -286,7 +290,8 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
 * **Stage 2 (model)**: the DiT is finetuned with the velocity-space losses.
   Default trains cross-attention weights directly (`--train-method
   xattn|selfattn|attn|full|noxattn`); `--lora RANK` trains a peft LoRA
-  instead (required for Z-Image, Anima, and Krea).
+  instead (required for Z-Image, Anima, Krea, and SenseNova). SenseNova is
+  model-stage only — it has no separable text encoder to run stage 1 on.
 
 ## Tuning notes (learned from the proofs)
 
@@ -327,6 +332,128 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
   needs ~42GB). Park the VAE on CPU while training. Composite phrases
   backward one rule at a time so four graphs do not sit on the 12B DiT.
   Official advice is still train LoRAs on Raw and run them on Turbo.
+* SenseNova-U1.5: LoRA-only on the `_mot_gen` generation branch (what the
+  official 8-step LoRA targets), rank 16, `--stage model`. 512px training
+  (256 image tokens) on a 48GB card; bf16 weights alone are ~33GiB, so there
+  is no room for a second copy or for the encoder stage. Five things are
+  unlike every other backend here: timesteps run **0 (noise) -> 1 (image)**,
+  the initial noise is scaled by `sqrt(tokens/64)` rather than unit variance,
+  there is no VAE (latents are patch-32 pixels), text conditioning is a
+  KV-cache prefix rather than an embedding tensor, and **velocity is not O(1)
+  across `t`**. Never let the model's
+  `prepare_flash_kv_cache` fast path run during training — it copies K/V into
+  a preallocated buffer in place and silently drops gradients to
+  `k_proj_mot_gen`/`v_proj_mot_gen`; the backend leaves the cache unprepared
+  so the `torch.cat` fallback keeps the graph.
+  `--stage encoder` is unavailable: understanding and generation share the
+  same 42 layers and one joint attention, so `disable_adapter()` cannot tell
+  the two stages apart.
+  Suggested phrase shape and knobs (the first composite attempt at `--lr 1e-4`
+  with a bare `#` anchor learned a global relight, see below):
+  `--lr 5e-5`, and anchor a *random* prompt rather than only the
+  unconditional one —
+  `{random_prompt}#{random_prompt}:0.4|human=robot:0.8|robot%human:-0.1`.
+  A drift shared by every conditional prompt survives CFG untouched, so
+  nothing penalises it unless a real prompt is anchored. Watch that the
+  anchor's logged loss is actually nonzero during the run.
+  **Count iterations in micro-steps**: this backend declares
+  `accumulation_steps=8`, so `--iterations 250` is only ~31 optimizer steps.
+  Budget 800-2000 iterations (~1-2.5 h at 512px) for the same number of
+  updates the earlier rounds took.
+* **`''` is a prompt on SenseNova, not the CFG negative.** `t2i_generate`
+  templates every user prompt — `''` included — with `SYSTEM_MESSAGE_FOR_GEN`
+  and the pre-closed think block (251 tokens for empty text), and builds the
+  unconditional separately as a bare 9-token query with neither. The backend
+  originally routed `''` to the bare query, which put a ~240-token *template*
+  difference into every direction the DSL forms out of `v(p) - v('')`: on the
+  real checkpoint that contaminant has std 0.011-0.025 against a human->robot
+  direction of std 0.022-0.040, and it does not point along the concept
+  (cos -0.12 to -0.20). It also made `#` anchor a prompt image generation
+  never visits, which is why `[#:0.4]` logged 0.0000 all run while every
+  conditional prompt drifted together. `''` now takes the conditional
+  template; the negative lives behind `sensenova.CFG_UNCOND`, which only
+  `_cfg` reaches, so sampling still reproduces `t2i_generate` exactly.
+* **An op can only teach an edit where the sampler will look for it.** `=`
+  used to draw `z_ctx` from the *target* concept's trajectory while training
+  the *source* prompt there. That is only sound when the a->b direction is
+  smooth enough in `z` to carry from one trajectory to the other. In pixel
+  space it is not: measured on SenseNova with the composite proof's own
+  prompts, the frozen human->robot direction at the robot trajectory has cos
+  `+0.36 / +0.03 / -0.01` with the same direction at the human trajectory at
+  `t = 0.045 / 0.167 / 0.423`, while those latents differ by only
+  `0.7% / 2.8% / 10.5%` in norm — the direction decorrelates faster than the
+  trajectories separate. So the run fits a target orthogonal to the one it
+  needs, the only surviving component is the prompt-independent one (a global
+  relight that moves the control as much as the targets), and the grid shows
+  no edit at all even though the LoRA is healthy and the loss is clean.
+  `OpDefaults.write_context` (`--write-context`) selects the trajectory;
+  SenseNova declares `"source"` through `training_defaults`, the other
+  backends keep `"target"` until their proofs are re-run. `--` and `#` already
+  sample in the trained prompt's own context; `++`'s non-probe path still does
+  not, which matters for any phrase that uses `~`.
+* **A velocity MSE is only fair if `|v|` is flat in `t`.** The DSL losses are
+  unweighted MSEs at a uniformly sampled timestep, which assumes every
+  timestep contributes comparably — true for diffusers sigma-space
+  velocities. SenseNova's head predicts the clean sample and divides,
+  `v = (x_pred - z) / (1 - t)`, so raw `|v|` grows ~4x over the training
+  schedule and the top of it carried ~16x the MSE weight. The cheapest way to
+  cut such a loss is a low-frequency DC offset shared by every prompt, so the
+  first run produced a global relight (every cell darker and more saturated,
+  the *control* moving more than the targets) with the humans left untouched.
+  Backends now declare the divisor through `Backend.velocity_loss_scale`, and
+  `ops` scales both sides of each MSE by it — which turns the loss into an
+  MSE on `x_pred`, since the shared `z` cancels out of the difference.
+  `scripts/smoke_sensenova.py` asserts the schedule is flat, and with
+  `--adapter DIR` re-checks that a trained LoRA held a control prompt's mean
+  luminance **at the training schedule**, not just at `generate_steps` — a
+  schedule-local bias reads as merely dim in the 50-step verification grid
+  and as near-black at the 16 steps the trainer sampled `z_ctx` on.
+* **Flattening `|v|` does not flatten the loss, and one draw per optimizer
+  step throws away what is left.** `velocity_loss_scale` only removes the
+  `1/(1-t)` that lives in the *parameterisation* of `v`. What survives is
+  physical: once the sampler has nearly resolved the image, changing the
+  prompt barely changes `x_pred`. Measured on SenseNova over its 16-point
+  training schedule with the composite proof's own phrase, the `=` loss runs
+
+  | idx | 0 | 1 | 2 | 3 | 8 | 11 | 15 |
+  |---|---|---|---|---|---|---|---|
+  | t | 0.000 | 0.022 | 0.046 | 0.071 | 0.250 | 0.423 | 0.833 |
+  | loss | 0.1958 | 0.0124 | 0.0026 | 0.0014 | 0.00085 | 0.00027 | 0.00005 |
+
+  a **3704x** range with **96%** of the total in the first three indices (at
+  idx 0 nothing is denoised yet, so the prompt alone has to produce the image
+  and the push the op asks for is 25% of `|v|`; by idx 3 it is 2%). That
+  concentration is the signal, not a bias to correct. It becomes fatal only
+  because **AdamW is scale invariant**: a draw worth 5e-5 moves the weights
+  exactly as far as one worth 0.196. At `accumulation_steps=1` roughly 13 of
+  every 16 updates were full-`lr` steps along sampling noise, which is why two
+  clean 250-step rounds produced a LoRA with the right *magnitude*
+  (`|delta|` 34-47% of what the objective asked for) and a nearly random
+  *direction* (cos +0.06…+0.37, sign-flipping across templates) — a random
+  walk with a faint drift, visible in the grid as a relight rather than an
+  edit. Summing the gradient over an accumulation window first restores the
+  loss magnitude as the importance weight it already is, and
+  `model_train.stop_index_for` gives each micro-step of a window its own
+  stratum of the schedule so a window cannot miss the informative end (i.i.d.
+  draws miss all three top indices in 17% of 8-draw windows). Backends declare
+  the window through `training_defaults`; SenseNova asks for 8, the diffusers
+  backends stay at 1 and are byte-for-byte unaffected. The training log now
+  prints the drawn timestep index next to every loss — without it a
+  three-order-of-magnitude spread reads as "flat 1e-4 noise".
+* **`#` freezes whatever CFG anchors on, which is not always `''`.** The
+  rendered velocity is `v_u + g(v_c - v_u)` = `g·v_c - (g-1)·v_u`, so drift in
+  the negative lands on *every* prompt at 3x the default guidance 4.0 — a
+  prompt-independent contaminant no other rule in a composite phrase can see.
+  Measured on the failed 250-step adapter, `CFG_UNCOND` drifted `|d|/|v|`
+  0.0075 / 0.0045 / 0.0035 at `t = 0.045 / 0.167 / 0.423` and supplied
+  **23% / 72% / 71%** of the rendered velocity change on a control prompt that
+  no rule mentions. `#` was anchoring `''` instead, which — once `''` became a
+  real templated prompt — the sampler never evaluates at all, so it was an
+  anchor on nothing (and duly logged 0.0000). Backends now name their negative
+  through `Backend.cfg_negative_prompt`; it is `''` everywhere except
+  SenseNova, so the op is unchanged for them. This anchors the *shared*
+  channel only: per-prompt drift still needs
+  `{random_prompt}#{random_prompt}`.
 
 ## Credits
 

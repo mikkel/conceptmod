@@ -98,3 +98,39 @@ class Backend(abc.ABC):
     def training_defaults(self) -> dict:
         """Backend-specific OpDefaults overrides (sample_steps / sample_guidance)."""
         return {}
+
+    def cfg_negative_prompt(self) -> str:
+        """The prompt classifier-free guidance anchors on while sampling.
+
+        The DSL's bare ``#`` freezes *this*, because a drift in it reaches
+        every rendered prompt: ``v_u + g (v_c - v_u)`` puts it on each render
+        with weight ``-(g - 1)``, so at g=4 an unanchored negative is a
+        prompt-independent contaminant amplified 3x -- a global relight that
+        moves control prompts as much as targets.
+
+        On every diffusers backend here that prompt is the empty string, which
+        is also the reference the DSL forms concept directions against, so the
+        two coincide and this is a no-op. SenseNova is the exception: it builds
+        its negative from a separate bare query, and ``''`` is a real prompt
+        the sampler never evaluates.
+        """
+        return ""
+
+    def velocity_loss_scale(self, timestep: torch.Tensor) -> float:
+        """Factor applied to both sides of an op's velocity MSE at ``timestep``.
+
+        The DSL losses are plain MSEs between velocity fields summed over a
+        uniformly sampled timestep, which silently assumes ``|v|`` has the
+        same order of magnitude everywhere on the schedule. That holds for
+        diffusers sigma-space velocities, so the default is 1.0.
+
+        It does *not* hold for a head that predicts the clean sample and
+        divides by a factor vanishing at one end of the schedule (SenseNova:
+        ``v = (x_pred - z) / (1 - t)``). There the handful of samples drawn
+        near that end outweigh every other timestep by orders of magnitude,
+        and the cheapest way to cut such a loss is a low-frequency DC offset
+        shared by every prompt -- a global relight instead of a concept edit.
+        Such a backend returns that divisor here, which turns the op MSE back
+        into an MSE on the quantity the network actually predicts.
+        """
+        return 1.0
