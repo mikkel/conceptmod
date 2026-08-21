@@ -6,13 +6,24 @@ diffusers module paths onto the native names ComfyUI's model code uses, and
 writes ``<name>_comfyui.safetensors`` beside the original. Originals are never
 touched. CPU only.
 
+Music 3 concept sliders (LoRANetwork ``lora_down``/``lora_up`` under
+``lora_unet-`` / ``lora_te-``) use the same script: detect ``music3`` /
+``music3_lm`` and, for the DiT, fuse ``to_q``/``to_k``/``to_v`` into
+ComfyUI's ``self_attn.to_qkv``. Anima/Krea mapping is unchanged.
+
+LM keys stay as separate ``q_proj``/``k_proj``/``v_proj``/``o_proj`` (official
+Comfy-Org bf16 CLIP). Pruned/int8 Music 3 CLIP checkpoints merge those into
+``qkv_proj``; ComfyUI then logs the q/k/v LoRA keys unused. ``o_proj`` still
+binds. See ``tests/test_comfyui_lora_apply.py``.
+
 The reference target format is ``anima_masterpiece_example.safetensors``:
 896 bf16 tensors, keys ``diffusion_model.blocks.N.<native>.lora_{A,B}.weight``,
-no alpha tensors, metadata ``{"format": "pt"}``.
+no alpha tensors, metadata ``{\"format\": \"pt\"}``.
 
     python scripts/convert_lora_comfyui.py outputs/
     python scripts/convert_lora_comfyui.py outputs/32_anima --force \
         --check-against anima_masterpiece_example.safetensors
+    python scripts/convert_lora_comfyui.py path/to/energy_unit_last.safetensors
 """
 from __future__ import annotations
 
@@ -80,10 +91,12 @@ MODEL_CLASSES = {
     "Krea2Transformer2DModel": "krea",
     "ZImageTransformer2DModel": "zimage",
     "SanaTransformer2DModel": "sana",
+    "MiniMaxMusic3Transformer1DModel": "music3",
 }
 # Backends whose ComfyUI key naming we could not verify against a known-good
 # file. anima is verified; krea is derived from this repo's own loader.
-UNVERIFIED = {"krea"}
+# music3 is derived from ComfyUI MiniMax Music 3 module names, not a loading file.
+UNVERIFIED = {"krea", "music3", "music3_lm"}
 UNSUPPORTED = {
     "zimage": "ComfyUI key naming for Z-Image is unknown; refusing to guess",
     "sana": "ComfyUI key naming for Sana is unverified; refusing to guess",
@@ -116,15 +129,91 @@ def map_krea(module: str):
     return None
 
 
-MAPPERS = {"anima": map_anima, "krea": map_krea}
+# sliders-conceptmod LoRANetwork (delimiter="-") → ComfyUI MiniMax Music 3 DiT.
+# Native names: comfy/ldm/minimax_music/dit.py (fused self_attn.to_qkv).
+MUSIC3_TF_PREFIX = "lora_unet-"
+MUSIC3_LM_PREFIX = "lora_te-"
+MUSIC3_QKV = {
+    "attn-to_q": "self_attn.to_q",
+    "attn-to_k": "self_attn.to_k",
+    "attn-to_v": "self_attn.to_v",
+}
+MUSIC3_BLOCK = {
+    "attn-to_out-0": "self_attn.to_out",
+    "ff_in": "ff.ff.0.proj",
+    "ff_out": "ff.ff.2",
+}
+MUSIC3_ROOT = {
+    "proj_in": "diffusion_transformer.transformer.project_in",
+    "proj_out": "diffusion_transformer.transformer.project_out",
+    "preprocess_conv": "diffusion_transformer.preprocess_conv",
+    "postprocess_conv": "diffusion_transformer.postprocess_conv",
+    "time_embed-linear_1": "diffusion_transformer.to_timestep_embed.0",
+    "time_embed-linear_2": "diffusion_transformer.to_timestep_embed.2",
+}
+MUSIC3_BLOCK_RE = re.compile(r"^transformer_blocks-(\d+)-(.+)$")
+MUSIC3_LM_RE = re.compile(
+    r"^model-layers-(\d+)-self_attn-(q_proj|k_proj|v_proj|o_proj)$")
+_MUSIC3_QKV_KEY = re.compile(
+    r"^(diffusion_model\.diffusion_transformer\.transformer\.layers\.\d+"
+    r"\.self_attn\.)(to_q|to_k|to_v)\.(lora_A|lora_B)\.weight$"
+)
+
+
+def map_music3(module: str):
+    """Map a LoRANetwork Music 3 transformer module onto its ComfyUI DiT name."""
+    if module.startswith(MUSIC3_TF_PREFIX):
+        module = module[len(MUSIC3_TF_PREFIX):]
+    if module in MUSIC3_ROOT:
+        return MUSIC3_ROOT[module]
+    match = MUSIC3_BLOCK_RE.match(module)
+    if not match:
+        return None
+    idx, tail = match.group(1), match.group(2)
+    if tail in MUSIC3_QKV:
+        return f"diffusion_transformer.transformer.layers.{idx}.{MUSIC3_QKV[tail]}"
+    if tail in MUSIC3_BLOCK:
+        return f"diffusion_transformer.transformer.layers.{idx}.{MUSIC3_BLOCK[tail]}"
+    return None
+
+
+def map_music3_lm(module: str):
+    """Map a LoRANetwork Music 3 LM module onto the ComfyUI CLIP stem.
+
+    Separate q/k/v/o projections match official Comfy-Org bf16 CLIP. Pruned
+    checkpoints that expose ``self_attn.qkv_proj`` will not bind q/k/v.
+    """
+    if module.startswith(MUSIC3_LM_PREFIX):
+        module = module[len(MUSIC3_LM_PREFIX):]
+    match = MUSIC3_LM_RE.match(module)
+    if not match:
+        return None
+    return f"model.layers.{match.group(1)}.self_attn.{match.group(2)}"
+
+
+MAPPERS = {
+    "anima": map_anima,
+    "krea": map_krea,
+    "music3": map_music3,
+    "music3_lm": map_music3_lm,
+}
+
+# LoRANetwork stores down/up; PEFT stores A/B. Normalize to lora_A / lora_B.
+_LORA_SIDES = (
+    (".lora_A.weight", "lora_A"),
+    (".lora_B.weight", "lora_B"),
+    (".lora_down.weight", "lora_A"),
+    (".lora_up.weight", "lora_B"),
+    (".lora.down.weight", "lora_A"),
+    (".lora.up.weight", "lora_B"),
+)
 
 
 def split_lora_key(key: str):
     """Return (module_path, 'lora_A'|'lora_B') or None if not a LoRA weight."""
     if key.startswith(PEFT_PREFIX):
         key = key[len(PEFT_PREFIX):]
-    for side in ("lora_A", "lora_B"):
-        tail = f".{side}.weight"
+    for tail, side in _LORA_SIDES:
         if key.endswith(tail):
             return key[: -len(tail)], side
     return None
@@ -142,7 +231,7 @@ def classify(path: str):
         return f"unreadable ({exc})", None
     if not keys:
         return "empty file", None
-    if any(k.startswith("diffusion_model.") for k in keys):
+    if any(k.startswith(("diffusion_model.", "text_encoders.")) for k in keys):
         return "already ComfyUI format", None
     if not any(split_lora_key(k) for k in keys):
         return "no lora_A/lora_B keys (full checkpoint?)", None
@@ -180,6 +269,16 @@ def detect_backend(cfg, keys):
     if cls in MODEL_CLASSES:
         return MODEL_CLASSES[cls], f"adapter_config base_model_class={cls}"
     stems = {split_lora_key(k)[0] for k in keys if split_lora_key(k)}
+    if any(s.startswith(MUSIC3_TF_PREFIX) or s.startswith("transformer_blocks-")
+           for s in stems):
+        return "music3", "key heuristic (LoRANetwork music3 transformer)"
+    if any(s.startswith(MUSIC3_LM_PREFIX) or "-self_attn-q_proj" in s
+           for s in stems):
+        return "music3_lm", "key heuristic (LoRANetwork music3 LM)"
+    if cfg.get("kind") == "language_model":
+        return "music3_lm", "sidecar kind=language_model"
+    if cfg.get("kind") == "transformer":
+        return "music3", "sidecar kind=transformer"
     if any(s.startswith("text_fusion.") for s in stems):
         return "krea", "key heuristic (text_fusion.*)"
     if any(re.match(r"transformer_blocks\.\d+\.attn\.", s) for s in stems):
@@ -195,16 +294,80 @@ def detect_backend(cfg, keys):
 # ----------------------------------------------------------------- conversion
 
 
+def _block_diag_up(parts):
+    """Fuse independent LoRAs that share an input dim onto one Linear."""
+    downs = [down for down, _up, _alpha in parts]
+    ups = [up for _down, up, _alpha in parts]
+    ranks = [int(down.shape[0]) for down in downs]
+    out_sizes = [int(up.shape[0]) for up in ups]
+    total_rank = sum(ranks)
+    scales = [float(alpha) / max(rank, 1)
+              for (_d, _u, alpha), rank in zip(parts, ranks)]
+    shared = all(abs(scale - scales[0]) <= 1e-6 for scale in scales)
+    fused_down = torch.cat(downs, dim=0)
+    fused_up = ups[0].new_zeros((sum(out_sizes), total_rank))
+    rank_offset = out_offset = 0
+    for up, rank, out_dim, scale in zip(ups, ranks, out_sizes, scales):
+        fused_up[out_offset:out_offset + out_dim,
+                 rank_offset:rank_offset + rank] = up if shared else up * scale
+        rank_offset += rank
+        out_offset += out_dim
+    fused_alpha = (scales[0] * total_rank) if shared else float(total_rank)
+    return fused_down, fused_up, fused_alpha
+
+
+def _fuse_music3_qkv(out, dest_alphas):
+    """Replace separate to_q/to_k/to_v with ComfyUI's fused to_qkv."""
+    groups = {}
+    for key in list(out):
+        match = _MUSIC3_QKV_KEY.match(key)
+        if not match:
+            continue
+        stem, proj, side = match.group(1), match.group(2), match.group(3)
+        groups.setdefault(stem, {}).setdefault(proj, {})[side] = key
+    extra_unmapped = []
+    for stem, projs in groups.items():
+        if set(projs) != {"to_q", "to_k", "to_v"}:
+            extra_unmapped.append(f"incomplete QKV under {stem}")
+            continue
+        parts = []
+        for proj in ("to_q", "to_k", "to_v"):
+            dest = f"{stem}{proj}"[len("diffusion_model."):]
+            down = out[projs[proj]["lora_A"]].float()
+            up = out[projs[proj]["lora_B"]].float()
+            parts.append((down, up, dest_alphas.get(dest, float(down.shape[0]))))
+        fused_down, fused_up, fused_alpha = _block_diag_up(parts)
+        for proj in ("to_q", "to_k", "to_v"):
+            for side in ("lora_A", "lora_B"):
+                del out[projs[proj][side]]
+            dest_alphas.pop(f"{stem}{proj}"[len("diffusion_model."):], None)
+        dest = f"{stem}to_qkv"[len("diffusion_model."):]
+        out[f"diffusion_model.{dest}.lora_A.weight"] = (
+            fused_down.to(TARGET_DTYPE).contiguous())
+        out[f"diffusion_model.{dest}.lora_B.weight"] = (
+            fused_up.to(TARGET_DTYPE).contiguous())
+        dest_alphas[dest] = fused_alpha
+    return extra_unmapped
+
+
 def convert(path: str, backend: str, cfg: dict):
     """Return (tensors, dropped, unmapped) for one PEFT LoRA file."""
     mapper = MAPPERS[backend]
     rank = cfg.get("r")
     alpha = cfg.get("lora_alpha")
     emit_alpha = rank is not None and alpha is not None and alpha != rank
+    key_prefix = "text_encoders" if backend == "music3_lm" else "diffusion_model"
 
     out, dropped, unmapped, alpha_paths = {}, [], [], set()
+    file_alphas = {}
+    dest_from_module = {}
     with safe_open(path, framework="pt") as f:
         for key in f.keys():
+            if key.endswith(".alpha"):
+                module = key[: -len(".alpha")]
+                file_alphas[module] = float(
+                    f.get_tensor(key).detach().float().cpu().reshape(-1)[0])
+                continue
             parts = split_lora_key(key)
             if parts is None:
                 unmapped.append(key)
@@ -217,15 +380,29 @@ def convert(path: str, backend: str, cfg: dict):
             if dest is None:
                 unmapped.append(key)
                 continue
-            name = f"diffusion_model.{dest}.{side}.weight"
+            name = f"{key_prefix}.{dest}.{side}.weight"
             out[name] = f.get_tensor(key).to(TARGET_DTYPE).contiguous().cpu()
             alpha_paths.add(dest)
+            dest_from_module[module] = dest
+
+    dest_alphas = {}
+    for module, dest in dest_from_module.items():
+        if module in file_alphas:
+            dest_alphas[dest] = file_alphas[module]
+    if backend == "music3":
+        unmapped.extend(_fuse_music3_qkv(out, dest_alphas))
 
     # The example file carries no alpha tensors: a missing alpha means scale
     # 1.0, which is exactly alpha/r when lora_alpha == r (every backend here).
-    if emit_alpha:
+    # Music 3 sliders carry per-module alpha (unit-normalized files bake scale
+    # into it), so those are always written.
+    if dest_alphas:
+        for dest, value in dest_alphas.items():
+            out[f"{key_prefix}.{dest}.alpha"] = torch.tensor(
+                float(value), dtype=torch.float32)
+    elif emit_alpha:
         for dest in sorted(alpha_paths):
-            out[f"diffusion_model.{dest}.alpha"] = torch.tensor(
+            out[f"{key_prefix}.{dest}.alpha"] = torch.tensor(
                 float(alpha), dtype=torch.float32)
     return out, dropped, unmapped
 
@@ -236,13 +413,18 @@ def pattern(key: str) -> str:
     Anchored on ``blocks.`` so that genuine module suffixes -- the .1/.2 of
     ``adaln_modulation_*`` -- survive and are still compared.
     """
-    return re.sub(r"(blocks\.)\d+\.", r"\1N.", key)
+    key = re.sub(r"(blocks\.)\d+\.", r"\1N.", key)
+    return re.sub(r"(layers\.)\d+\.", r"\1N.", key)
 
 
 def reference_backend(example: str):
     """Name the backend a reference ComfyUI LoRA belongs to, by its key style."""
     with safe_open(example, framework="pt") as f:
         keys = list(f.keys())
+    if any(".self_attn.to_qkv." in k for k in keys):
+        return "music3"
+    if any(k.startswith("text_encoders.model.layers.") for k in keys):
+        return "music3_lm"
     if any(".self_attn.q_proj." in k or ".cross_attn.q_proj." in k for k in keys):
         return "anima"
     if any(".attn.wq." in k for k in keys):
@@ -319,8 +501,13 @@ def main():
                 failures.append(path)
             continue
         if backend in UNVERIFIED:
-            print("    WARNING: key naming for this backend is derived from "
-                  "this repo's loader, not verified against a loading file")
+            if backend in ("music3", "music3_lm"):
+                print("    WARNING: Music 3 names come from ComfyUI "
+                      "minimax_music/dit.py and model_lora_keys_clip, "
+                      "not a known-good loading LoRA")
+            else:
+                print("    WARNING: key naming for this backend is derived from "
+                      "this repo's loader, not verified against a loading file")
 
         tensors, dropped, unmapped = convert(path, backend, cfg)
         print(f"    {len(tensors)} keys converted from {len(keys)} source keys")
