@@ -18,7 +18,7 @@ Stable Diffusion) targeting current flow-matching DiT models via
 | `qwen` | Qwen-Image (Edit: same PEFT layout) | `Qwen/Qwen-Image` | 20B | LoRA 16 · 512px | 50 steps · CFG 4 |
 | `cpu` (tests) | Tiny fake flow-matching DiT | none (in-repo, no Hub) | ~0 | LoRA 4 · 8px latent | 4 Euler steps · CFG 1 |
 
-The `cpu` backend is a tiny in-repo DiT for the pytest cycle (`tests/test_cpu_sample.py`, `scripts/smoke_cpu.py`) so `red=blue` trains without a GPU or Hub weights.
+The `cpu` backend is a tiny in-repo DiT for the pytest cycle (`tests/test_cpu_sample.py`, `scripts/smoke_cpu.py`) so `red=blue` trains without a GPU or Hub weights. A 2-D CPU suite (`scripts/analyze_2d.py`, [docs/2d-analysis.md](docs/2d-analysis.md)) scores write / ESD / GEM / EA / `++` on orthogonal color vs pattern axes.
 
 SDXL is conceptmod 1.x (UNet + CLIP), not this stack. Krea Turbo is the 8-step distilled sibling. Official advice is still train LoRAs on Raw and run them on Turbo; a local ComfyUI / Kitchen NVFP4 file (``--model-id models/kreaturboft_nvfp4.safetensors``) dequants to bf16 so the same LoRA trainer can run on Turbo itself.
 
