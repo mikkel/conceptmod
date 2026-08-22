@@ -15,6 +15,7 @@ Stable Diffusion) targeting current flow-matching DiT models via
 | `zimage` | Z-Image Turbo | `Tongyi-MAI/Z-Image-Turbo` | 6B | LoRA 16 · 768px | 8 steps · CFG 0 |
 | `anima` | Anima Base | `circlestone-labs/Anima-Base-v1.0-Diffusers` | 2B | LoRA 16 · 768px | 40 steps · CFG 4 |
 | `krea` | Krea 2 Raw / local Turbo | `krea/Krea-2-Raw` or a ComfyUI `.safetensors` | 12B | LoRA 16 · 512px | Raw 28 / CFG 4.5 · Turbo 8 / CFG 0 |
+| `qwen` | Qwen-Image (Edit: same PEFT layout) | `Qwen/Qwen-Image` | 20B | LoRA 16 · 512px | 50 steps · CFG 4 |
 
 SDXL is conceptmod 1.x (UNet + CLIP), not this stack. Krea Turbo is the 8-step distilled sibling. Official advice is still train LoRAs on Raw and run them on Turbo; a local ComfyUI / Kitchen NVFP4 file (``--model-id models/kreaturboft_nvfp4.safetensors``) dequants to bf16 so the same LoRA trainer can run on Turbo itself.
 
@@ -354,6 +355,21 @@ python train.py --phrase "..." --stage model      # DiT finetune only (skip the 
   NVFP4 is dequantized to bf16 before the LoRA is attached (A6000-class
   cards do not have native FP4 tensor cores). Filename containing
   `turbo` selects 8 steps / CFG 0.
+* Qwen-Image: LoRA-only, same velocity-space DSL. The 20B DiT is too
+  large for a VM full-train smoke; `scripts/smoke_qwen.py` is the labeled
+  GPU path. Qwen-Image-Edit shares the PEFT module layout and the same
+  convert mapper (`--backend qwen`).
+
+## ComfyUI export
+
+`python scripts/convert_lora_comfyui.py outputs/` is the CLI for
+`conceptmod.convert` — one converter, not a second path. Each written
+`*_comfyui.safetensors` gets a sidecar JSON (`arch`, `fused_qkv`,
+`host=lm|dit`, `unit_scale`, `recommended_range`).
+
+Krea block names are checked against the Comfy-Org Krea-2 turbo LoRA
+(`loras/krea2_turbo_lora_rank_64_bf16.safetensors`). Z-Image and Sana
+still refuse to guess.
 
 ## Credits
 

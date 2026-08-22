@@ -12,6 +12,8 @@ Examples:
         --backend anima --out outputs/anima_composite
     python train.py --phrase "#:0.4|human=robot:0.8|robot%human:-0.1" \
         --backend krea --out outputs/krea_composite
+    python train.py --phrase "vibrant colors++" --backend qwen --lora 16 \
+        --out outputs/qwen_exaggerate
 """
 
 from __future__ import annotations
