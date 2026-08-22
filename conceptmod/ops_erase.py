@@ -14,10 +14,13 @@ Modes
     ``ops.rule_loss``.
 
 ``gem``
-    GEM-inspired (Grebe et al., ICML'26, arXiv:2606.00140): contrastive
-    velocity matching. Attract the trained erase-prompt velocity toward a
-    frozen *keep* / unconditional field; repel it from the frozen erase
-    field. ``L = relu(||v_t(c) - v_f(keep)|| - η ||v_t(c) - v_f(c)||)``.
+    GEM-inspired (Grebe et al., ICML'26, arXiv:2606.00140, Eqs. 13–14):
+    contrastive velocity matching. Attract the trained erase-prompt
+    velocity toward a *safe* field and repel it from the frozen erase
+    field. ``L = relu(||v_t(c) - v_safe|| - η ||v_t(c) - v_f(c)||)``.
+    Paper ``ĉ`` is a harmless rewording of ``c``, not an orthogonal keep
+    concept — this hook builds ``v_safe`` with ESD reverse-CFG
+    (paper Eq. 2 / uncond). ``erase_keep`` is a retain term only.
     Not a full GEM port: no multi-timestep trajectory window, no LoRA-on-
     Flux dual-stream Q/K.
 
@@ -95,17 +98,44 @@ def _l2(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
 
 
 def gem_loss(rule: dsl.Rule, ctx: ops.StepContext) -> torch.Tensor:
-    """GEM-inspired hinge: attract to keep/uncond, repel from erase."""
+    """GEM hinge (paper Eq. 14): attract to a *safe* field, repel from erase.
+
+    Grebe et al. ICML'26 Eqs. 13–14:
+
+        d_pos = ||v_t(c) − v_f(ĉ)||     # pull toward the teacher's safe anchor
+        d_neg = ||v_t(c) − v_f(c)||     # push off the teacher's erase field
+        L     = relu(d_pos − η d_neg)
+
+    ``ĉ`` is a harmless rewording of the erase prompt (or ESD reverse-CFG
+    when no explicit anchor exists — paper Eq. 2). It is **not** an
+    orthogonal keep concept. The previous hook used ``erase_keep`` as
+    ``ĉ``, which converted the erase prompt into the keep concept on the
+    2-D fixture (leak ≈ +2.86). Keep, if set, is a retain MSE only —
+    same role as EA / ``#``.
+
+    Still missing vs the paper: the ``t ∈ {0..t_stop}`` trajectory window
+    and LoRA on Flux dual-stream Q/K. This is the smallest velocity-space
+    hinge that is geometrically an erase, not a convert-to-keep.
+    """
     eta = getattr(ctx.cfg, "gem_eta", None)
     if eta is None:
-        eta = rule.options.get("guidance", _GEM_ETA)
+        eta = rule.options.get("eta", _GEM_ETA)
     eta = float(eta)
+    g = rule.options.get("guidance", ctx.cfg.erase_guidance)
     c = formatted_erase_prompt(rule, ctx)
-    keep = getattr(ctx.cfg, "erase_keep", "") or ""
     vt = ctx.v(c, c, frozen=False, grad=True)
-    v_safe = ctx.v(keep, c, frozen=True)
-    v_unsafe = ctx.v(c, c, frozen=True)
-    return F.relu(_l2(vt, v_safe) - eta * _l2(vt, v_unsafe))
+    v0 = ctx.v("", c, frozen=True)
+    vc = ctx.v(c, c, frozen=True)
+    # Safe attractor = ESD reverse-CFG of uncond, never v(keep).
+    v_safe = esd_target(v0, vc, float(g))
+    loss = F.relu(_l2(vt, v_safe) - eta * _l2(vt, vc))
+    keep = getattr(ctx.cfg, "erase_keep", "") or ""
+    if keep:
+        lam = float(getattr(ctx.cfg, "erase_retain", _EA_RETAIN))
+        vf = ctx.v(keep, keep, frozen=True)
+        vk = ctx.v(keep, keep, frozen=False, grad=True)
+        loss = loss + lam * F.mse_loss(vk, vf)
+    return loss
 
 
 def ea_loss(rule: dsl.Rule, ctx: ops.StepContext) -> torch.Tensor:

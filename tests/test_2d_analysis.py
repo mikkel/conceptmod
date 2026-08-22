@@ -133,11 +133,14 @@ def test_esd_plus_freeze_matches_ea_keep():
     assert abs(freeze.after.pattern_on_red) < 0.25
 
 
-def test_gem_attracts_erase_toward_keep():
-    """The GEM hook is the wrong attractor on this field (needs help)."""
+def test_gem_erases_red_without_becoming_stripe():
+    """GEM must drop the erase axis and not convert red into stripe."""
     result = run_method("erase_gem", f"{COLOR}--", erase_mode="gem")
-    assert result.verdict == "needs help"
-    assert result.after.pattern_on_red > 0.4
+    assert result.verdict == "right"
+    assert result.after.color_on_red < 0.2
+    assert result.before.color_on_red - result.after.color_on_red > 0.5
+    assert result.after.stripe_hold > 0.85
+    assert abs(result.after.pattern_on_red) < 0.25
 
 
 def test_suite_verdicts_and_budget():
@@ -148,5 +151,5 @@ def test_suite_verdicts_and_budget():
     assert by_name["erase_ea"].verdict == "right"
     assert by_name["exaggerate"].verdict == "right"
     assert by_name["erase_esd_freeze"].verdict == "right"
-    assert by_name["erase_gem"].verdict == "needs help"
+    assert by_name["erase_gem"].verdict == "right"
     assert sum(r.elapsed_s for r in results) < 30.0
