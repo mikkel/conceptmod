@@ -261,6 +261,9 @@ MAPPERS = {
     "qwen": map_qwen,
 }
 
+from conceptmod.convert_klein import register as _register_klein  # noqa: E402
+_register_klein(MAPPERS, MODEL_CLASSES, UNVERIFIED, HOST, RECOMMENDED_RANGE, FUSED_QKV)
+
 # LoRANetwork stores down/up; PEFT stores A/B. Normalize to lora_A / lora_B.
 _LORA_SIDES = (
     (".lora_A.weight", "lora_A"),
@@ -356,6 +359,10 @@ def detect_backend(cfg, keys):
         return "music3_lm", "sidecar kind=language_model"
     if cfg.get("kind") == "transformer":
         return "music3", "sidecar kind=transformer"
+    from conceptmod.convert_klein import detect_from_stems as _detect_klein
+    klein_hit = _detect_klein(stems)
+    if klein_hit is not None:
+        return klein_hit
     if any(s.startswith("text_fusion.") for s in stems):
         return "krea", "key heuristic (text_fusion.*)"
     if any(re.match(r"transformer_blocks\.\d+\.attn\.to_gate", s) for s in stems):
@@ -506,6 +513,9 @@ def convert(path: str, backend: str, cfg: dict):
             dest_alphas[dest] = file_alphas[module]
     if backend == "music3":
         unmapped.extend(_fuse_music3_qkv(out, dest_alphas))
+    if backend == "klein":
+        from conceptmod.convert_klein import fuse_qkv as _fuse_klein
+        unmapped.extend(_fuse_klein(out, dest_alphas, _block_diag_up, TARGET_DTYPE))
 
     # The example file carries no alpha tensors: a missing alpha means scale
     # 1.0, which is exactly alpha/r when lora_alpha == r (every backend here).
@@ -552,6 +562,9 @@ def reference_backend(example: str):
         return "anima"
     if any(".attn.wq." in k for k in keys):
         return "krea"
+    from conceptmod.convert_klein import looks_like_comfy as _klein_comfy
+    if _klein_comfy(keys):
+        return "klein"
     if any(re.search(r"transformer_blocks\.\d+\.attn\.to_q\.", k) for k in keys):
         return "qwen"
     return None
@@ -626,9 +639,13 @@ def main():
                 failures.append(path)
             continue
         if backend in UNVERIFIED:
-            print("    WARNING: Music 3 names come from ComfyUI "
-                  "minimax_music/dit.py and model_lora_keys_clip, "
-                  "not a known-good loading LoRA")
+            if backend == "klein":
+                from conceptmod.convert_klein import UNVERIFIED_WARNING
+                print(f"    WARNING: {UNVERIFIED_WARNING}")
+            else:
+                print("    WARNING: Music 3 names come from ComfyUI "
+                      "minimax_music/dit.py and model_lora_keys_clip, "
+                      "not a known-good loading LoRA")
 
         tensors, dropped, unmapped = convert(path, backend, cfg)
         print(f"    {len(tensors)} keys converted from {len(keys)} source keys")
