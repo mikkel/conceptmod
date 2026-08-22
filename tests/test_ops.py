@@ -127,7 +127,7 @@ def test_require_cuda_rejects_cpu():
 def test_unknown_backend_rejected():
     from conceptmod.backends import BACKENDS, load_backend
 
-    assert BACKENDS == ("sana", "zimage", "anima", "krea", "qwen", "cpu")
+    assert BACKENDS == ("sana", "zimage", "anima", "krea", "qwen", "cpu", "klein")
     with pytest.raises(ValueError, match="unknown backend"):
         load_backend("nope", device="cpu")
     with pytest.raises(ValueError, match="1.x"):
