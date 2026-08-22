@@ -1,0 +1,1292 @@
+{
+  "fixture": {
+    "color_axis": "red=+e_x / blue=\u2212e_x",
+    "pattern_axis": "stripe=+e_y / dot=\u2212e_y",
+    "residual": "shared rank-2 LoRA on the class path",
+    "losses": "ops.rule_loss (DSL + ESD) / ops_erase.erase_loss (GEM, EA)",
+    "steps": 40
+  },
+  "methods": [
+    {
+      "name": "neutralize",
+      "phrase": "red--:guidance=0",
+      "erase_mode": null,
+      "verdict": "right",
+      "note": "ESD guidance 0 maps red to uncond (origin), not to blue. Already a phrase recipe \u2014 not a new operator.",
+      "elapsed_s": 0.02190852165222168,
+      "before": {
+        "step": 0,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "after": {
+        "step": 40,
+        "color_on_red": 0.015094757080078125,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": -0.0385267436504364,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 0.9992586374282837,
+        "red_norm": 0.015094757080078125,
+        "stripe_norm": 1.0007418394088745
+      },
+      "history": [
+        {
+          "step": 0,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 5,
+          "color_on_red": 0.7370741963386536,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.021454572677612305,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.999769926071167,
+          "red_norm": 0.7370741963386536,
+          "stripe_norm": 1.000230073928833
+        },
+        {
+          "step": 10,
+          "color_on_red": -0.12475788593292236,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.04293765127658844,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9990794062614441,
+          "red_norm": 0.12475788593292236,
+          "stripe_norm": 1.000921368598938
+        },
+        {
+          "step": 15,
+          "color_on_red": -0.3362489938735962,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.04615095257759094,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9989367723464966,
+          "red_norm": 0.3362489938735962,
+          "stripe_norm": 1.0010643005371094
+        },
+        {
+          "step": 20,
+          "color_on_red": 0.1532883644104004,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.03629294037818909,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9993420839309692,
+          "red_norm": 0.1532883644104004,
+          "stripe_norm": 1.0006582736968994
+        },
+        {
+          "step": 25,
+          "color_on_red": 0.23611712455749512,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.03417809307575226,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9994164109230042,
+          "red_norm": 0.23611712455749512,
+          "stripe_norm": 1.0005838871002197
+        },
+        {
+          "step": 30,
+          "color_on_red": -0.009003162384033203,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.03920447826385498,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9992323517799377,
+          "red_norm": 0.009003162384033203,
+          "stripe_norm": 1.0007681846618652
+        },
+        {
+          "step": 35,
+          "color_on_red": -0.14654326438903809,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.041731417179107666,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.999130368232727,
+          "red_norm": 0.14654326438903809,
+          "stripe_norm": 1.0008703470230103
+        },
+        {
+          "step": 40,
+          "color_on_red": 0.015094757080078125,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.0385267436504364,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9992586374282837,
+          "red_norm": 0.015094757080078125,
+          "stripe_norm": 1.0007418394088745
+        }
+      ],
+      "points_before": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      },
+      "points_after": {
+        "red": [
+          0.015094757080078125,
+          0.0
+        ],
+        "blue": [
+          -0.015094757080078125,
+          0.0
+        ],
+        "stripe": [
+          -0.0385267436504364,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.038526751101017,
+          -1.0
+        ],
+        "red stripe": [
+          -0.023432016372680664,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "mix_write",
+      "phrase": "red=red stripe",
+      "erase_mode": null,
+      "verdict": "right",
+      "note": "Write red toward the mixed embedding: red keeps color and picks up stripe. First-class `+` would be a synonym here.",
+      "elapsed_s": 0.02154684066772461,
+      "before": {
+        "step": 0,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "after": {
+        "step": 40,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 1.0385267734527588,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.9849053025245667,
+        "write_cosine": -0.7124635577201843,
+        "stripe_hold": 1.0,
+        "red_norm": 1.4035805463790894,
+        "stripe_norm": 1.0385267734527588
+      },
+      "history": [
+        {
+          "step": 0,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 5,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.0214545726776123,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.26292580366134644,
+          "write_cosine": -0.9671297669410706,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0339874029159546,
+          "stripe_norm": 1.0214545726776123
+        },
+        {
+          "step": 10,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.0429376363754272,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 1.1247578859329224,
+          "write_cosine": -0.6644436717033386,
+          "stripe_hold": 1.0,
+          "red_norm": 1.5050184726715088,
+          "stripe_norm": 1.0429376363754272
+        },
+        {
+          "step": 15,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.0461509227752686,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 1.3362489938735962,
+          "write_cosine": -0.5991611480712891,
+          "stripe_hold": 1.0,
+          "red_norm": 1.6690001487731934,
+          "stripe_norm": 1.0461509227752686
+        },
+        {
+          "step": 20,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.0362929105758667,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.8467116951942444,
+          "write_cosine": -0.7631763219833374,
+          "stripe_hold": 1.0,
+          "red_norm": 1.3103132247924805,
+          "stripe_norm": 1.0362929105758667
+        },
+        {
+          "step": 25,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.0341781377792358,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.7638828158378601,
+          "write_cosine": -0.7946733236312866,
+          "stripe_hold": 1.0,
+          "red_norm": 1.2583787441253662,
+          "stripe_norm": 1.0341781377792358
+        },
+        {
+          "step": 30,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.039204478263855,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 1.0090031623840332,
+          "write_cosine": -0.7039309144020081,
+          "stripe_hold": 1.0,
+          "red_norm": 1.4205939769744873,
+          "stripe_norm": 1.039204478263855
+        },
+        {
+          "step": 35,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.041731357574463,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 1.146543264389038,
+          "write_cosine": -0.6573030352592468,
+          "stripe_hold": 1.0,
+          "red_norm": 1.5213682651519775,
+          "stripe_norm": 1.041731357574463
+        },
+        {
+          "step": 40,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 1.0385267734527588,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.9849053025245667,
+          "write_cosine": -0.7124635577201843,
+          "stripe_hold": 1.0,
+          "red_norm": 1.4035805463790894,
+          "stripe_norm": 1.0385267734527588
+        }
+      ],
+      "points_before": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      },
+      "points_after": {
+        "red": [
+          1.0,
+          0.9849053025245667
+        ],
+        "blue": [
+          -1.0,
+          -0.9849053025245667
+        ],
+        "stripe": [
+          0.0,
+          1.0385267734527588
+        ],
+        "dot": [
+          0.0,
+          -1.0385267734527588
+        ],
+        "red stripe": [
+          1.0,
+          2.0234322547912598
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "isolate_write",
+      "phrase": "red stripe=stripe",
+      "erase_mode": null,
+      "verdict": "right",
+      "note": "Write the mix onto stripe: `red stripe` lands on e_y. Standalone red/stripe drift is the linear LoRA class, same caveat as the antipodal write swap.",
+      "elapsed_s": 0.020933866500854492,
+      "before": {
+        "step": 0,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "after": {
+        "step": 40,
+        "color_on_red": 0.5012162923812866,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": -0.46378815174102783,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 0.9071813225746155,
+        "red_norm": 0.5012162923812866,
+        "stripe_norm": 1.1023154258728027
+      },
+      "history": [
+        {
+          "step": 0,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 5,
+          "color_on_red": 0.7391893863677979,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.2320011854171753,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9741276502609253,
+          "red_norm": 0.7391893863677979,
+          "stripe_norm": 1.0265594720840454
+        },
+        {
+          "step": 10,
+          "color_on_red": 0.22971487045288086,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.7225459814071655,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.8105546236038208,
+          "red_norm": 0.22971487045288086,
+          "stripe_norm": 1.2337230443954468
+        },
+        {
+          "step": 15,
+          "color_on_red": 0.5538657903671265,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.41143929958343506,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9247840046882629,
+          "red_norm": 0.5538657903671265,
+          "stripe_norm": 1.0813335180282593
+        },
+        {
+          "step": 20,
+          "color_on_red": 0.620444655418396,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.3485108017921448,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9442959427833557,
+          "red_norm": 0.620444655418396,
+          "stripe_norm": 1.0589900016784668
+        },
+        {
+          "step": 25,
+          "color_on_red": 0.4367103576660156,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.5252476930618286,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.8853076100349426,
+          "red_norm": 0.4367103576660156,
+          "stripe_norm": 1.129550814628601
+        },
+        {
+          "step": 30,
+          "color_on_red": 0.4184887409210205,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.5430873036384583,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.8787686228752136,
+          "red_norm": 0.4184887409210205,
+          "stripe_norm": 1.137955904006958
+        },
+        {
+          "step": 35,
+          "color_on_red": 0.5402876734733582,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.4261454939842224,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9199511408805847,
+          "red_norm": 0.5402876734733582,
+          "stripe_norm": 1.0870141983032227
+        },
+        {
+          "step": 40,
+          "color_on_red": 0.5012162923812866,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.46378815174102783,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9071813225746155,
+          "red_norm": 0.5012162923812866,
+          "stripe_norm": 1.1023154258728027
+        }
+      ],
+      "points_before": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      },
+      "points_after": {
+        "red": [
+          0.5012162923812866,
+          0.0
+        ],
+        "blue": [
+          -0.5012162923812866,
+          0.0
+        ],
+        "stripe": [
+          -0.46378815174102783,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.46378812193870544,
+          -1.0
+        ],
+        "red stripe": [
+          0.03742814064025879,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "orthogonal_noop",
+      "phrase": "red%stripe",
+      "erase_mode": null,
+      "verdict": "right",
+      "note": "Axes already start orthogonal, so the |cos| loss is 0.",
+      "elapsed_s": 0.024457216262817383,
+      "before": {
+        "step": 0,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "after": {
+        "step": 40,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "history": [
+        {
+          "step": 0,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 5,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 10,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 15,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 20,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 25,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 30,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 35,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 40,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        }
+      ],
+      "points_before": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      },
+      "points_after": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "blend_noop",
+      "phrase": "red%stripe:-1|stripe%red:-1",
+      "erase_mode": null,
+      "verdict": "right",
+      "note": "Axes already start orthogonal, so |cos| is 0 and the gradient vanishes. Negative % cannot *create* a mix from a perpendicular pair \u2014 use `red=red stripe`.",
+      "elapsed_s": 0.030742168426513672,
+      "before": {
+        "step": 0,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "after": {
+        "step": 40,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "history": [
+        {
+          "step": 0,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 5,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 10,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 15,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 20,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 25,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 30,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 35,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 40,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        }
+      ],
+      "points_before": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      },
+      "points_after": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "preserve",
+      "phrase": "red--|#|stripe#stripe",
+      "erase_mode": null,
+      "verdict": "right",
+      "note": "Erase + freeze uncond + freeze keep. `#` on \u2205 is a no-op on this e=0 uncond; `stripe#stripe` is the live retain. Same keep geometry as `red--|stripe#stripe`.",
+      "elapsed_s": 0.03097391128540039,
+      "before": {
+        "step": 0,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "after": {
+        "step": 40,
+        "color_on_red": -1.1669175624847412,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0052282363176345825,
+        "pattern_on_red": 0.0,
+        "write_cosine": 1.0,
+        "stripe_hold": 0.9999863505363464,
+        "red_norm": 1.1669175624847412,
+        "stripe_norm": 1.0000135898590088
+      },
+      "history": [
+        {
+          "step": 0,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 5,
+          "color_on_red": 0.7385241389274597,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.014885470271110535,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9998891949653625,
+          "red_norm": 0.7385241389274597,
+          "stripe_norm": 1.0001107454299927
+        },
+        {
+          "step": 10,
+          "color_on_red": -0.14326977729797363,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.020006142556667328,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9997999668121338,
+          "red_norm": 0.14326977729797363,
+          "stripe_norm": 1.0002000331878662
+        },
+        {
+          "step": 15,
+          "color_on_red": -1.5271835327148438,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.01645536720752716,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9998646378517151,
+          "red_norm": 1.5271835327148438,
+          "stripe_norm": 1.0001353025436401
+        },
+        {
+          "step": 20,
+          "color_on_red": -1.6044561862945557,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.01211857795715332,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9999266266822815,
+          "red_norm": 1.6044561862945557,
+          "stripe_norm": 1.0000733137130737
+        },
+        {
+          "step": 25,
+          "color_on_red": -0.8661514520645142,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.003532037138938904,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9999937415122986,
+          "red_norm": 0.8661514520645142,
+          "stripe_norm": 1.0000061988830566
+        },
+        {
+          "step": 30,
+          "color_on_red": -0.5820605754852295,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.003084525465965271,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9999952912330627,
+          "red_norm": 0.5820605754852295,
+          "stripe_norm": 1.0000046491622925
+        },
+        {
+          "step": 35,
+          "color_on_red": -0.8119635581970215,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0037142038345336914,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9999931454658508,
+          "red_norm": 0.8119635581970215,
+          "stripe_norm": 1.0000067949295044
+        },
+        {
+          "step": 40,
+          "color_on_red": -1.1669175624847412,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0052282363176345825,
+          "pattern_on_red": 0.0,
+          "write_cosine": 1.0,
+          "stripe_hold": 0.9999863505363464,
+          "red_norm": 1.1669175624847412,
+          "stripe_norm": 1.0000135898590088
+        }
+      ],
+      "points_before": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      },
+      "points_after": {
+        "red": [
+          -1.1669175624847412,
+          0.0
+        ],
+        "blue": [
+          1.1669175624847412,
+          0.0
+        ],
+        "stripe": [
+          0.0052282363176345825,
+          0.9999999403953552
+        ],
+        "dot": [
+          -0.0052282363176345825,
+          -1.0
+        ],
+        "red stripe": [
+          -1.161689281463623,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "replace_macro",
+      "phrase": "red~blue",
+      "erase_mode": null,
+      "verdict": "recipe",
+      "note": "`~` expands to `blue++ | red=blue | blue%red:-\u03bb`. On this linear antipodal LoRA the ++ and = terms oppose each other, so the macro is not an independent geometric job. Use `=` or `++` alone when you want a clean 2-D story.",
+      "elapsed_s": 0.03542327880859375,
+      "before": {
+        "step": 0,
+        "color_on_red": 1.0,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": 0.0,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 1.0,
+        "red_norm": 1.0,
+        "stripe_norm": 0.9999999403953552
+      },
+      "after": {
+        "step": 40,
+        "color_on_red": 0.40495944023132324,
+        "pattern_on_stripe": 0.9999999403953552,
+        "color_on_stripe": -0.029748469591140747,
+        "pattern_on_red": 0.0,
+        "write_cosine": -1.0,
+        "stripe_hold": 0.9995577335357666,
+        "red_norm": 0.40495944023132324,
+        "stripe_norm": 1.000442385673523
+      },
+      "history": [
+        {
+          "step": 0,
+          "color_on_red": 1.0,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": 0.0,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 1.0,
+          "red_norm": 1.0,
+          "stripe_norm": 0.9999999403953552
+        },
+        {
+          "step": 5,
+          "color_on_red": 0.7356381416320801,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.02152971923351288,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9997683763504028,
+          "red_norm": 0.7356381416320801,
+          "stripe_norm": 1.0002316236495972
+        },
+        {
+          "step": 10,
+          "color_on_red": 0.03136253356933594,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.039936065673828125,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9992035627365112,
+          "red_norm": 0.03136253356933594,
+          "stripe_norm": 1.0007970333099365
+        },
+        {
+          "step": 15,
+          "color_on_red": 0.3029329776763916,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.033347710967063904,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9994443655014038,
+          "red_norm": 0.3029329776763916,
+          "stripe_norm": 1.0005558729171753
+        },
+        {
+          "step": 20,
+          "color_on_red": 0.5245647430419922,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.02717137336730957,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9996311068534851,
+          "red_norm": 0.5245647430419922,
+          "stripe_norm": 1.0003689527511597
+        },
+        {
+          "step": 25,
+          "color_on_red": 0.3859134912490845,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.030632153153419495,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9995312094688416,
+          "red_norm": 0.3859134912490845,
+          "stripe_norm": 1.0004689693450928
+        },
+        {
+          "step": 30,
+          "color_on_red": 0.21655380725860596,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.034478023648262024,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9994061589241028,
+          "red_norm": 0.21655380725860596,
+          "stripe_norm": 1.000594139099121
+        },
+        {
+          "step": 35,
+          "color_on_red": 0.33494776487350464,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.03158488869667053,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9995015263557434,
+          "red_norm": 0.33494776487350464,
+          "stripe_norm": 1.000498652458191
+        },
+        {
+          "step": 40,
+          "color_on_red": 0.40495944023132324,
+          "pattern_on_stripe": 0.9999999403953552,
+          "color_on_stripe": -0.029748469591140747,
+          "pattern_on_red": 0.0,
+          "write_cosine": -1.0,
+          "stripe_hold": 0.9995577335357666,
+          "red_norm": 0.40495944023132324,
+          "stripe_norm": 1.000442385673523
+        }
+      ],
+      "points_before": {
+        "red": [
+          1.0,
+          0.0
+        ],
+        "blue": [
+          -1.0,
+          0.0
+        ],
+        "stripe": [
+          0.0,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.0,
+          -1.0
+        ],
+        "red stripe": [
+          1.0,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      },
+      "points_after": {
+        "red": [
+          0.40495944023132324,
+          0.0
+        ],
+        "blue": [
+          -0.40495944023132324,
+          0.0
+        ],
+        "stripe": [
+          -0.029748469591140747,
+          0.9999999403953552
+        ],
+        "dot": [
+          0.029748469591140747,
+          -1.0
+        ],
+        "red stripe": [
+          0.3752110004425049,
+          0.9999999403953552
+        ],
+        "\u2205": [
+          0.0,
+          0.0
+        ]
+      }
+    }
+  ]
+}
