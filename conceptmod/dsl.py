@@ -7,7 +7,10 @@ A *phrase* is a set of rules separated by ``|``:
 Operators (see README for semantics):
 
     c++            exaggerate concept c            (options: alpha, guidance)
-    c--            erase concept c
+    c--            erase concept c                 (options: alpha, guidance)
+                   guidance=0 neutralizes to uncond (no antipode write);
+                   default g>0 is ESD and writes toward the opposite
+                   on an antipodal pair
     a=b            write: remap prompt a so it behaves like concept b
                    ("=b" / "b=" writes b into the empty/unconditional prompt)
     a#b            freeze: keep a's prediction pinned to frozen model's b
@@ -224,6 +227,12 @@ def _describe_rule(rule: Rule) -> str:
             f"including prompts that never mention it."
         )
     if rule.op == ERASE:
+        g = rule.options.get("guidance")
+        if g is not None and float(g) == 0.0:
+            return (
+                f"Neutralize {_q(rule.a)}: map those prompts to the empty "
+                f"prompt (ESD guidance 0 — erase without writing an antipode)."
+            )
         return (
             f"Erase {_q(rule.a)}: prompts that ask for it should come out without it."
         )

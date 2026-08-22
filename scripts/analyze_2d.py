@@ -23,6 +23,7 @@ from conceptmod.analysis_2d import (
     run_suite,
     write_artifacts,
 )
+from conceptmod.analysis_dsl import JOB_TITLES, run_jobs, write_job_artifacts
 
 
 def main():
@@ -31,17 +32,29 @@ def main():
     p.add_argument("--steps", type=int, default=DEFAULT_STEPS)
     p.add_argument("--lr", type=float, default=DEFAULT_LR)
     p.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    p.add_argument(
+        "--jobs", action="store_true",
+        help="score phrase-DSL jobs (recipes vs missing ops) instead of the erase/GEM suite",
+    )
     args = p.parse_args()
 
-    results = run_suite(steps=args.steps, lr=args.lr, seed=args.seed)
-    paths = write_artifacts(results, out=args.out)
+    if args.jobs:
+        titles = JOB_TITLES
+        results = run_jobs(steps=args.steps, lr=args.lr, seed=args.seed)
+        paths = write_job_artifacts(results, out=args.out)
+        label = "DSL jobs"
+    else:
+        titles = METHOD_TITLES
+        results = run_suite(steps=args.steps, lr=args.lr, seed=args.seed)
+        paths = write_artifacts(results, out=args.out)
+        label = "erase / GEM"
     total = sum(r.elapsed_s for r in results)
     print(f"fixture: red/blue (color) vs stripe/dot (pattern), shared LoRA")
-    print(f"wall time: {total:.2f}s  steps={args.steps}")
+    print(f"suite: {label}  wall time: {total:.2f}s  steps={args.steps}")
     print()
     for r in results:
         print(
-            f"  {r.verdict:11s}  {METHOD_TITLES[r.name]:40s}  "
+            f"  {r.verdict:11s}  {titles.get(r.name, r.name):42s}  "
             f"red={r.after.color_on_red:+.3f}  "
             f"stripe_hold={r.after.stripe_hold:+.3f}  "
             f"leak={r.after.pattern_on_red:+.3f}  "
