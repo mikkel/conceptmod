@@ -371,19 +371,20 @@ def _verdict_for(name: str, before: ProbeSnapshot, after: ProbeSnapshot) -> tupl
         return "needs help", "Protected erase failed to move red."
 
     if name == "erase_gem":
-        # GEM attract-to-keep is a different target than ESD's flip.
         pulled_to_keep = after.pattern_on_red > 0.4 and after.color_on_red < 0.6
         if pulled_to_keep:
             return "needs help", (
-                "GEM hinge attracts v(red) toward v(stripe), so the erase "
-                "prompt becomes the keep concept. The hook is too thin "
-                "(no trajectory window, no dual-stream Q/K) and the keep "
-                "prompt is the wrong attractor for a 2-D erase."
+                "GEM still converts red into stripe — the safe attractor "
+                "is wrong (keep must not be ĉ)."
             )
-        if after.color_on_red < 0.2 and keep_ok:
+        if after.color_on_red < 0.2 and keep_ok and not leak_on_red:
             return "right", (
-                "GEM reduced the red probe without stealing the stripe axis."
+                "GEM hinge attracts toward the ESD safe field (uncond "
+                "reverse-CFG), not toward stripe. Keep is a retain term. "
+                "Erase-axis drops; stripe hold stays high."
             )
+        if after.color_on_red < 0.2:
+            return "needs help", "GEM erased red but leaked onto the keep axis."
         return "needs help", (
             "GEM did not produce a clean erase; the contrastive hinge is "
             "under-specified for this field."
@@ -501,7 +502,7 @@ def plot_quiver(results: list[MethodResult], path: Path) -> None:
         ax.set_ylabel("pattern  (stripe → +)")
         badge = "right" if result.verdict == "right" else "needs help"
         ax.set_title(f"{METHOD_TITLES[result.name]}\n{badge}", fontsize=10)
-        lim = 3.6
+        lim = 4.2
         ax.set_xlim(-lim, lim)
         ax.set_ylim(-lim, lim)
         ax.grid(True, alpha=0.25)

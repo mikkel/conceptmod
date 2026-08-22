@@ -16,14 +16,16 @@ No GPU, no Hub, no 20B train. Plots live in
 |---|---|---|---|
 | write `=` | `red=blue` | **right** | Red CFG flips onto frozen blue. Stripe hold stays ~1. |
 | erase ESD | `red--` (live `rule_loss`) | **right** | Same target as write at guidance 1 (`−CFG(red) = CFG(blue)`). Stripe holds. |
-| erase GEM | `red--` + keep=`stripe` | **needs help** | Hinge attracts `v(red)` toward `v(stripe)`. Red picks up a large pattern component (`leak ≈ +2.86`). The keep *prompt* barely moves; the erase prompt *becomes* the keep concept. |
+| erase GEM | `red--` + keep=`stripe` | **right** | Hinge attracts toward the ESD safe field (uncond reverse-CFG), not toward stripe. Leak `+2.86 → +0.00`. Stripe hold 1.000. Overshoots the color axis (hinge has no restoring force past the Voronoi cell). |
 | erase EA | `red--` + keep=`stripe` | **right** | ESD plus a retain MSE on stripe. Red erases; stripe hold is 1.000 (a hair cleaner than ESD). |
 | exaggerate `++` | `red++` | **right** | Classic (no random-probe) `++` stretches color from +1 to ~+3. Stripe holds. |
 | ESD + freeze `#` | `red--\|stripe#stripe` | **right** | Live-DSL way to pin the keep axis. Same keep geometry as the EA hook. |
 
-GEM / EA **do not help vs ESD on this fixture**. ESD is already clean on
-the keep axis. EA is a redundant retain (you can write the same thing as
-`#`). GEM is actively wrong: the keep prompt is the wrong attractor.
+GEM is **no-longer-wrong**. It does **not** help vs ESD on this fixture:
+ESD was already clean on the keep axis, and GEM's extra color overshoot
+(`-3.41` vs ESD `-1.17`) is the hinge coasting, not a better erase. EA /
+`#` remain the retain. A real GEM port still needs the trajectory window
+and dual-stream Q/K.
 
 ![quiver](../outputs/2d_analysis/quiver.png)
 
@@ -31,7 +33,7 @@ the keep axis. EA is a redundant retain (you can write the same thing as
 
 ![trajectories](../outputs/2d_analysis/trajectories.png)
 
-*Left: target probe. Middle: keep-prompt probe. Right: pattern component of `red` — this is where GEM leaks.*
+*Left: target probe. Middle: keep-prompt probe. Right: pattern component of `red` — GEM's convert-to-keep used to show up here; it is now flat.*
 
 ![table](../outputs/2d_analysis/table.png)
 
@@ -76,9 +78,10 @@ already start orthogonal, so the loss is ~0).
 
 ## What is right, and what is a side effect
 
-**Write, ESD, `++`, EA, ESD+`#`** all move only the color column of the
-linear map. Stripe's own CFG stays on `e_y`. That is the geometrically
-right 2-D story, and it is what the 1-D cosine check could not see.
+**Write, ESD, `++`, EA, ESD+`#`, GEM** all move only the color column of
+the linear map. Stripe's own CFG stays on `e_y`. That is the
+geometrically right 2-D story, and it is what the 1-D cosine check could
+not see.
 
 Two caveats the pictures make obvious:
 
@@ -93,40 +96,54 @@ Two caveats the pictures make obvious:
 
 2. **ESD g=1 is write-to-opposite.** The ESD target
    `v* = v('') − (v(red) − v(''))` is exactly `CFG(blue)` when blue is
-   `−red`. The two methods produce the same numbers here. That is correct
+   `−red`. Write and ESD produce the same numbers here. That is correct
    ESD geometry, not a wiring mistake.
 
 ## GEM vs ESD vs EA
 
-`ops_erase.gem_loss` is a hinge
+Grebe et al. (ICML'26, [arXiv:2606.00140](https://arxiv.org/abs/2606.00140)
+Eqs. 13–14) define
 
 ```
-relu( ||v_t(red) − v_f(keep)|| − η ||v_t(red) − v_f(red)|| )
+d_pos = ||v_t(c) − v_f(ĉ)||     # attract to the teacher's *safe* anchor
+d_neg = ||v_t(c) − v_f(c)||     # repel from the teacher's erase field
+L     = relu(d_pos − η d_neg)
 ```
 
-With `keep=stripe` it is satisfied as soon as trained red is closer to
-*stripe* than to frozen red. It does not require reaching uncond, and it
-does not flip the concept. On this field red ends at about `(-1.86, +2.86)`:
-past the color origin and deep into the pattern half-plane. Stripe's own
-probe only drifts from 1.00 to 1.07 — a 1-D keep-probe would call that
-"preserved" while the erase prompt has become a stripe.
+Paper `ĉ` is a harmless rewording of `c` (or ESD reverse-CFG when no
+explicit anchor exists — their Eq. 2). It is **not** an orthogonal keep
+concept. The first hook used `erase_keep` as `ĉ`, so with
+`keep=stripe` the hinge was satisfied as soon as trained red was closer
+to *stripe* than to frozen red. Red ended at about `(-1.86, +2.86)`:
+convert-to-keep. Stripe's own probe only drifted 1.00 → 1.07 — a 1-D
+keep-probe would have called that "preserved."
+
+The hook now builds `v_safe` with ESD reverse-CFG of uncond and treats
+`erase_keep` as a retain MSE (same role as EA / `#`). On this field:
+
+| | leak `⟨CFG(red), e_y⟩` | stripe hold | color on red |
+|---|---|---|---|
+| GEM before (keep as `ĉ`) | **+2.860** | +0.998 | −1.860 |
+| GEM after (uncond/ESD `ĉ`) | **+0.000** | +1.000 | −3.409 |
+| ESD | +0.000 | +0.998 | −1.167 |
+
+GEM is geometrically an erase again. It does not beat ESD: the keep axis
+was already clean, and the extra color travel is the hinge going slack
+once `d_pos < η d_neg` (no restoring force to the exact target). Still
+missing vs the paper: the `t ∈ {0..t_stop}` trajectory window and LoRA
+on Flux dual-stream Q/K.
 
 `ops_erase.ea_loss` is ESD plus `mse(v_t(stripe), v_f(stripe))`. That
-retain is the right *idea*, and it is already how `#` works. On this
-LoRA (small `A` init, unused pattern column) ESD barely leaks, so EA
-cannot show a save. The hook is too thin to matter: velocity-only, no
-attention regularizer, no bi-level LoRA, no `D_ir`.
+retain is the right *idea*, and it is already how `#` works.
 
 The 1-D `test_erase_cpu` fixture still passes for GEM because its
-residual is prompt-gated: GEM can move `delta_e` without ever touching
-`delta_k`. The 2-D field is what reveals the wrong attractor.
+residual is prompt-gated. The 2-D field is what caught the wrong
+attractor and now gates that it stays fixed.
 
-## What to change next
+## What is still missing / next
 
-- **GEM:** attract toward uncond (or the ESD negatively-guided target),
-  not toward `v(keep)`. Keep should be a *retain* term, the way EA / `#`
-  already do it. A real GEM port still needs the trajectory window and
-  dual-stream Q/K; this hinge is not that paper.
+- **GEM paper port:** trajectory window and dual-stream Q/K. Do not
+  advertise this hinge as GEM-the-paper.
 - **EA:** leave the hook, or delete it and tell people to write
   `c--|keep#keep`. Wiring `--erase-mode` is still optional; the live
   default should stay ESD.
@@ -135,6 +152,4 @@ residual is prompt-gated: GEM can move `delta_e` without ever touching
   `TwoConceptVelocity`) instead of a linear map of antipodes.
 - **Leak stress test:** raise `A`'s init (or put LoRA on a shared
   `linear1`) if you want ESD to leak on purpose. Standard PEFT init
-  (`B = 0`, small `A`) does **not** wreck the keep axis here — the
-  hypothesis that "cosine can hide a wrecked keep axis" is true for GEM,
-  not for ESD / write / `++` on this LoRA.
+  (`B = 0`, small `A`) does **not** wreck the keep axis here.
