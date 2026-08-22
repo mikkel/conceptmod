@@ -515,7 +515,9 @@ def convert(path: str, backend: str, cfg: dict):
         unmapped.extend(_fuse_music3_qkv(out, dest_alphas))
     if backend == "klein":
         from conceptmod.convert_klein import fuse_qkv as _fuse_klein
-        unmapped.extend(_fuse_klein(out, dest_alphas, _block_diag_up, TARGET_DTYPE))
+        unmapped.extend(_fuse_klein(
+            out, dest_alphas, _block_diag_up, TARGET_DTYPE,
+            default_alpha=alpha))
 
     # The example file carries no alpha tensors: a missing alpha means scale
     # 1.0, which is exactly alpha/r when lora_alpha == r (every backend here).

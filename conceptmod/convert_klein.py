@@ -108,8 +108,20 @@ def _fuse_group(out, dest_alphas, block_diag_up, target_dtype, groups, order,
         dest_alphas[dest] = fused_alpha
 
 
-def fuse_qkv(out, dest_alphas, block_diag_up, target_dtype):
-    """Fuse separate QKV LoRAs onto Comfy ``img_attn.qkv`` / ``linear1``."""
+def fuse_qkv(out, dest_alphas, block_diag_up, target_dtype, default_alpha=None):
+    """Fuse separate QKV LoRAs onto Comfy ``img_attn.qkv`` / ``linear1``.
+
+    ``default_alpha`` is PEFT ``lora_alpha`` when the file has no per-module
+    ``.alpha`` tensors. Missing dest alphas then fall back to rank, which
+    under-scales fused QKV when ``lora_alpha != r``.
+    """
+    if default_alpha is not None:
+        for key in list(out):
+            if _DOUBLE_QKV.match(key) or _SINGLE_QKV.match(key):
+                dest = key[len("diffusion_model."):-len(".lora_A.weight")]
+                if dest.endswith(".lora_B.weight"):
+                    dest = key[len("diffusion_model."):-len(".lora_B.weight")]
+                dest_alphas.setdefault(dest, float(default_alpha))
     extra_unmapped = []
     double_groups = {}
     single_groups = {}

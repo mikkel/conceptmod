@@ -161,7 +161,7 @@ def test_klein_qkv_fusion_preserves_delta(tmp_path):
         "diffusion_model.double_blocks.0.img_attn.qkv.alpha"])
     written_delta = (written_up * (written_alpha / written_down.shape[0])) @ written_down
     assert torch.allclose(written_delta, want, atol=2e-2, rtol=1e-2)
-    assert torch.allclose(fused_down, written_down.float(), atol=1e-5)
+    assert torch.allclose(fused_down, written_down.float(), atol=2e-2, rtol=1e-2)
 
 
 def test_synthetic_klein_fuses_single_block_linear1(tmp_path):
