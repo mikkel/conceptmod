@@ -14,6 +14,8 @@ Examples:
         --backend krea --out outputs/krea_composite
     python train.py --phrase "vibrant colors++" --backend qwen --lora 16 \
         --out outputs/qwen_exaggerate
+    python train.py --phrase "red=blue" --backend cpu --device cpu --stage model \
+        --lora 4 --iterations 80 --lr 1e-2 --out outputs/cpu_sample
 """
 
 from __future__ import annotations

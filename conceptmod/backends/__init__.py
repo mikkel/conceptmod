@@ -1,7 +1,7 @@
 from conceptmod.backends.base import Backend
 
 # One process, one backend. Switching --backend must not change the others.
-BACKENDS = ("sana", "zimage", "anima", "krea", "qwen")
+BACKENDS = ("sana", "zimage", "anima", "krea", "qwen", "cpu")
 
 
 def load_backend(name: str, device: str, **kwargs) -> Backend:
@@ -26,6 +26,10 @@ def load_backend(name: str, device: str, **kwargs) -> Backend:
         from conceptmod.backends.qwen import QwenBackend
 
         return QwenBackend(device=device, **kwargs)
+    if name in ("cpu", "dummy"):
+        from conceptmod.backends.cpu import CpuBackend
+
+        return CpuBackend(device=device, **kwargs)
     if name == "sdxl":
         raise ValueError(
             "SDXL is conceptmod 1.x (UNet + CLIP). "
