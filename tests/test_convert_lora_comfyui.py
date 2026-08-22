@@ -1,9 +1,12 @@
-"""Tests for scripts/convert_lora_comfyui.py.
+"""Tests for the ComfyUI LoRA convert path (conceptmod.convert).
 
 These encode the verification from ntc-ai/conceptmod#3: synthetic PEFT
 adapters covering every mapped Anima/Krea module, droppable Anima
 prefixes, alpha emission, and that KREA_BLOCK is the inverse of the
 linear entries in krea_weights._BLOCK_SUFFIX.
+
+Also: sidecar JSON, Qwen-Image identity mapper, PEFT ``.default`` strip,
+and a Krea gold-key check against Comfy-Org/Krea-2 turbo LoRA names.
 """
 from __future__ import annotations
 
@@ -16,18 +19,18 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
+from conceptmod import convert as cvt
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "convert_lora_comfyui.py"
+KREA_GOLD_KEYS = ROOT / "tests" / "fixtures" / "krea2_turbo_lora_rank_64_bf16.keys.json"
 
 
-def load_convert():
+def load_convert_cli():
     spec = importlib.util.spec_from_file_location("convert_lora_comfyui", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-
-
-cvt = load_convert()
 
 
 def _peft(module: str, side: str) -> str:
@@ -183,6 +186,14 @@ def test_cli_skips_existing_output(tmp_path, capsys):
     captured = capsys.readouterr().out
     assert "exists, skipping" in captured
     assert out.stat().st_mtime == first_mtime
+    side = Path(str(out) + ".json")
+    assert side.is_file()
+    payload = json.loads(side.read_text())
+    assert payload["arch"] == "krea"
+    assert payload["fused_qkv"] is False
+    assert payload["host"] == "dit"
+    assert payload["unit_scale"] is True
+    assert payload["recommended_range"] == [0.8, 1.2]
 
 
 # ---- Music 3 (LoRANetwork sliders, not PEFT) --------------------------------
@@ -429,3 +440,141 @@ def test_hub_gender_lm_slider():
     q_up = out["text_encoders.model.layers.0.self_attn.q_proj.lora_B.weight"]
     assert tuple(k_up.shape) == (1024, 8)
     assert tuple(q_up.shape) == (4096, 8)
+
+
+# ---- reusable convert path / sidecar / Qwen / Krea gold --------------------
+
+
+def test_cli_reexports_library():
+    cli = load_convert_cli()
+    assert cli.MAPPERS == cvt.MAPPERS
+    assert cli.convert is cvt.convert
+    assert cli.sidecar_metadata is cvt.sidecar_metadata
+
+
+def test_sidecar_metadata_hosts_and_unit_scale():
+    same = cvt.sidecar_metadata("anima", {"r": 8, "lora_alpha": 8}, n_keys=4)
+    assert same == {
+        "arch": "anima",
+        "fused_qkv": False,
+        "host": "dit",
+        "unit_scale": True,
+        "recommended_range": [0.6, 1.2],
+        "n_keys": 4,
+    }
+    scaled = cvt.sidecar_metadata("krea", {"r": 8, "lora_alpha": 16})
+    assert scaled["unit_scale"] is False
+    lm = cvt.sidecar_metadata("music3_lm", {})
+    assert lm["host"] == "lm"
+    assert lm["fused_qkv"] is False
+    dit = cvt.sidecar_metadata("music3", {})
+    assert dit["fused_qkv"] is True
+    assert dit["unit_scale"] is True
+    qwen = cvt.sidecar_metadata("qwen", {"r": 16, "lora_alpha": 16})
+    assert qwen["arch"] == "qwen"
+    assert qwen["host"] == "dit"
+    assert qwen["recommended_range"] == [0.8, 1.2]
+
+
+def test_strip_peft_default_on_split():
+    key = "base_model.model.transformer_blocks.0.attn.to_q.lora_A.default.weight"
+    assert cvt.split_lora_key(key) == ("transformer_blocks.0.attn.to_q", "lora_A")
+    key = "transformer.transformer_blocks.2.attn.to_v.lora_B.weight"
+    assert cvt.split_lora_key(key) == ("transformer_blocks.2.attn.to_v", "lora_B")
+
+
+def test_qwen_maps_identity_and_edit_layout():
+    assert cvt.map_qwen("transformer_blocks.3.attn.to_q") == (
+        "transformer_blocks.3.attn.to_q")
+    assert cvt.map_qwen("transformer_blocks.3.attn.add_q_proj") == (
+        "transformer_blocks.3.attn.add_q_proj")
+    assert cvt.map_qwen("transformer_blocks.3.img_mlp.net.0.proj") == (
+        "transformer_blocks.3.img_mlp.net.0.proj")
+    assert cvt.map_qwen("img_in") == "img_in"
+    assert cvt.map_qwen("time_text_embed.timestep_embedder.linear_1") == (
+        "time_text_embed.timestep_embedder.linear_1")
+    assert cvt.map_qwen("not_a_real_module") is None
+
+
+def test_detect_backend_qwen_from_config_and_keys():
+    cfg = {"auto_mapping": {"base_model_class": "QwenImageTransformer2DModel"}}
+    backend, why = cvt.detect_backend(cfg, [])
+    assert backend == "qwen"
+    assert "base_model_class" in why
+    keys = [_peft("transformer_blocks.0.attn.add_q_proj", "lora_A")]
+    backend, why = cvt.detect_backend({}, keys)
+    assert backend == "qwen"
+    assert "qwen" in why
+
+
+def test_synthetic_qwen_convert_strips_default(tmp_path):
+    modules = [
+        "transformer_blocks.0.attn.to_q",
+        "transformer_blocks.0.attn.to_k",
+        "transformer_blocks.0.attn.to_v",
+        "transformer_blocks.0.attn.to_out.0",
+        "transformer_blocks.0.attn.add_q_proj",
+    ]
+    tensors = {}
+    for module in modules:
+        tensors[f"base_model.model.{module}.lora_A.default.weight"] = torch.ones(8, 4)
+        tensors[f"base_model.model.{module}.lora_B.default.weight"] = torch.ones(4, 8)
+    path = tmp_path / "adapter_model.safetensors"
+    save_file(tensors, str(path))
+    out, dropped, unmapped = cvt.convert(str(path), "qwen", {"r": 8, "lora_alpha": 8})
+    assert not dropped and not unmapped
+    assert "diffusion_model.transformer_blocks.0.attn.to_q.lora_A.weight" in out
+    assert "diffusion_model.transformer_blocks.0.attn.add_q_proj.lora_B.weight" in out
+    assert not any(".default." in k for k in out)
+
+
+def test_krea_not_unverified_after_gold_match():
+    assert "krea" not in cvt.UNVERIFIED
+    assert "qwen" not in cvt.UNSUPPORTED
+    assert cvt.UNSUPPORTED["zimage"]
+    assert cvt.UNSUPPORTED["sana"]
+
+
+def _gold_krea_keyset():
+    payload = json.loads(KREA_GOLD_KEYS.read_text())
+    assert payload["repo"] == "Comfy-Org/Krea-2"
+    assert payload["file"] == "loras/krea2_turbo_lora_rank_64_bf16.safetensors"
+    return payload["keys"]
+
+
+def test_krea_block_and_root_names_exist_in_comfy_org_gold():
+    gold = {cvt.pattern(k) for k in _gold_krea_keyset()}
+    for stem, dest in cvt.KREA_STEMS:
+        for native in cvt.KREA_BLOCK.values():
+            for side in ("lora_down", "lora_up"):
+                # pattern() also collapses the ``blocks.N`` inside
+                # ``layerwise_blocks`` / ``refiner_blocks``.
+                want = cvt.pattern(f"diffusion_model.{dest}0.{native}.{side}.weight")
+                assert want in gold, want
+    for native in cvt.KREA_ROOT.values():
+        for side in ("lora_down", "lora_up"):
+            assert f"diffusion_model.{native}.{side}.weight" in gold
+
+
+def test_krea_check_against_comfy_org_gold_keys(tmp_path):
+    """Converted conceptmod Krea keys must all exist in the Comfy-Org turbo LoRA.
+
+    Gold file: Comfy-Org/Krea-2 loras/krea2_turbo_lora_rank_64_bf16.safetensors
+    (header-extracted key list; weights are not needed for --check-against).
+    Side-name convention differs (lora_A vs lora_down); pattern() normalizes it.
+    """
+    modules = []
+    for stem, _dest in cvt.KREA_STEMS:
+        for tail in cvt.KREA_BLOCK:
+            modules.append(f"{stem}0.{tail}")
+    modules.extend(cvt.KREA_ROOT)
+    src = _write_adapter(tmp_path / "adapter_model.safetensors", modules)
+    tensors, dropped, unmapped = cvt.convert(str(src), "krea", {"r": 8, "lora_alpha": 8})
+    assert not dropped and not unmapped
+    ref_tensors = {k: torch.ones(1) for k in _gold_krea_keyset()}
+    ref = tmp_path / "krea2_turbo_lora_rank_64_bf16.safetensors"
+    save_file(ref_tensors, str(ref))
+    assert cvt.reference_backend(str(ref)) == "krea"
+    assert cvt.check_against(tensors, str(ref), "krea")
+
+
