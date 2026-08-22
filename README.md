@@ -18,7 +18,7 @@ Stable Diffusion) targeting current flow-matching DiT models via
 | `qwen` | Qwen-Image (Edit: same PEFT layout) | `Qwen/Qwen-Image` | 20B | LoRA 16 · 512px | 50 steps · CFG 4 |
 | `cpu` (tests) | Tiny fake flow-matching DiT | none (in-repo, no Hub) | ~0 | LoRA 4 · 8px latent | 4 Euler steps · CFG 1 |
 
-The `cpu` backend is a tiny in-repo DiT for the pytest cycle (`tests/test_cpu_sample.py`, `scripts/smoke_cpu.py`) so `red=blue` trains without a GPU or Hub weights. A 2-D CPU suite (`scripts/analyze_2d.py`, [docs/2d-analysis.md](docs/2d-analysis.md)) scores write / ESD / GEM / EA / `++` on orthogonal color vs pattern axes.
+The `cpu` backend is a tiny in-repo DiT for the pytest cycle (`tests/test_cpu_sample.py`, `scripts/smoke_cpu.py`) so `red=blue` trains without a GPU or Hub weights. A 2-D CPU suite (`scripts/analyze_2d.py`, [docs/2d-analysis.md](docs/2d-analysis.md)) scores write / ESD / GEM / EA / `++` on orthogonal color vs pattern axes. Phrase-DSL jobs (what is already a recipe vs a missing op) are in [docs/dsl.md](docs/dsl.md).
 
 SDXL is conceptmod 1.x (UNet + CLIP), not this stack. Krea Turbo is the 8-step distilled sibling. Official advice is still train LoRAs on Raw and run them on Turbo; a local ComfyUI / Kitchen NVFP4 file (``--model-id models/kreaturboft_nvfp4.safetensors``) dequants to bf16 so the same LoRA trainer can run on Turbo itself.
 
@@ -266,7 +266,7 @@ Rules are separated by `|`. Each rule is scaled by an optional `:alpha`.
 | Syntax | Name | Effect |
 |---|---|---|
 | `c++` | exaggerate | more of concept `c` in **every** generation. Optional `:guidance=g` (default 3): how far past the model's own concept direction to push |
-| `c--` | erase | remove concept `c` (true ESD erasure, sampled in the concept's own context) |
+| `c--` | erase | remove concept `c` (true ESD erasure, sampled in the concept's own context). `:guidance=0` neutralizes to the empty prompt instead of writing the antipode |
 | `a=b` | write | **one loss**: remap prompt `a` so it behaves like concept `b`. Does not boost `b` globally. `=b` (or `b=`) writes `b` into the empty / unconditional prompt. Under CFG > 1 a baked-in unconditional acts like a negative prompt; sample at low guidance (or turbo / CFG-free) to see it as default content |
 | `a#b` | freeze | pin prompt `a` to the frozen model's behavior for `b`. Bare `#` pins the unconditional. Add `#`-rules to protect things you don't want to move |
 | `a%b` | orthogonal | decorrelate `b`'s concept direction from `a`'s. Negative alpha (`a%b:-1.0`) *aligns* them instead — blending |

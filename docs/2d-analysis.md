@@ -138,3 +138,35 @@ residual is prompt-gated: GEM can move `delta_e` without ever touching
   (`B = 0`, small `A`) does **not** wreck the keep axis here — the
   hypothesis that "cosine can hide a wrecked keep axis" is true for GEM,
   not for ESD / write / `++` on this LoRA.
+
+## DSL jobs: covered, already a recipe, dead here
+
+The suite above scores *methods*. This section scores *jobs* — things a
+user might want to say that look like missing operators. Full inventory
+(velocity formula vs docstring vs 2-D probe) is [dsl.md](dsl.md).
+Numbers are gated by `tests/test_dsl_jobs.py`. Plots:
+[`dsl_jobs_quiver.png`](../outputs/2d_analysis/dsl_jobs_quiver.png),
+[`dsl_jobs_table.png`](../outputs/2d_analysis/dsl_jobs_table.png).
+
+**No new operator.** Every useful geometric job on this field is either
+an existing op or a phrase recipe. `;` stays unimplemented. `^` cannot
+run here (`TwoAxisBackend` has no `render`). `@` is still stripped.
+
+| Job | Phrase | Verdict |
+|---|---|---|
+| exaggerate / bipolar slider | `red++` | **covered.** Color +1 → ~+3; `blue` → ~−3 on this linear antipodal LoRA. Stripe holds. |
+| write / ESD g=1 | `red=blue` / `red--` | **covered.** Identical targets (`−CFG(red)=CFG(blue)`). |
+| neutralize (erase ≠ write-opposite) | `red--:guidance=0` | **already a recipe.** Red → origin (~0), not onto blue. `describe_phrase` now says Neutralize. |
+| mix / add `red+stripe` | `red=red stripe` | **already a recipe.** Red → ~(1, 1). A first-class `+` would be a synonym on this additive embedding. |
+| isolate / extract pattern from the mix | `red stripe=stripe` | **already a recipe.** Mix lands on `e_y`. Standalone drift is the linear LoRA class. |
+| keep+erase | `red--\|stripe#stripe` | **covered** (already in the suite above). |
+| preserve-everything-except | `red--\|#\|stripe#stripe` | **already a recipe.** `#` on ∅ is a no-op here (`e('')=0`). |
+| orthogonal `%` | `red%stripe` | **no-op (right).** Axes start ⊥, so \|cos\|=0. |
+| blend from orthogonal | `red%stripe:-1\|stripe%red:-1` | **no-op, not a missing `+`.** \|cos\| has no gradient at 0. Use the mix write. |
+| replace `~` | `red~blue` | **macro, not independently right.** `blue++` and `red=blue` fight on antipodes. |
+| pixel `^` / reward `;` / `@` | — | **dead** (no renderer / not implemented / stripped). |
+
+```bash
+pytest tests/test_dsl_jobs.py tests/test_2d_analysis.py tests/test_dsl.py -q
+python scripts/analyze_2d.py --jobs --out outputs/2d_analysis
+```
